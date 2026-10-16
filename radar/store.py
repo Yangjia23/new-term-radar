@@ -86,7 +86,7 @@ def recent_sources(conn: sqlite3.Connection, today: date | None = None) -> list[
     rows = conn.execute("SELECT term, signals, notes, named FROM leads WHERE last_seen >= ? ORDER BY last_seen DESC, term",
                         (since,)).fetchall()
     out = [{"term": t, "kinds": json.loads(k), "note": (json.loads(n) or [""])[-1], "named": named} for t, k, n, named in rows]
-    return [r for r in out if {"x", "hf"} & set(r["kinds"])][:20]
+    return [r for r in out if {"x", "hf", "rising"} & set(r["kinds"])][:20]
 
 
 def summary(conn: sqlite3.Connection, today: date | None = None) -> dict:

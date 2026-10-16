@@ -12,16 +12,21 @@ from . import i18n, terms
 
 DEFAULTS = {
     "lang": "en",
+    "skip": [],                 # signals and steps never to run, as in --skip
     "x_accounts": {"labs": [], "bloggers": []},
     "sitemaps": {},
     "topics": {},
     "known_terms": [],
     "stop_words": [],
-    "judge": {"model": "gpt-4.1-mini", "min_score": 0.5},
+    "judge": {"model": "gpt-4.1-mini", "min_score": 0.5, "focus": "names"},   # focus "trends": viral trends only
     "breakout": {"window_days": 14, "min_stars": 300, "velocity_min": 200, "delta_min": 400},
     "new_sites": {"queries": {"ai": "%ai%"}, "weekday": 0, "window_days": 90, "min_etv": 1000, "min_keywords": 20},
     "review": {"after_days": 14, "per_day": 5},
-    "usecases": {"per_day": 5, "model": "claude-sonnet-4-6", "min_volume": 50, "trends_max": 10, "recheck_days": 3,
+    "domains": {"window_days": 3, "history_days": 30, "min_domains": 3, "min_domains_ai": 2, "min_lift": 3, "min_len": 5,
+                "max_terms": 25},
+    "rising": {"seeds": [], "window": "now 7-d", "geo": "", "min_rise": 1000, "reserve": 20},   # needs SERPAPI_API_KEY
+    "feishu": {"kinds": ["domain", "rising"]},     # the signals whose new names are pushed to Feishu
+    "usecases": {"per_day": 5, "generic": True, "model": "claude-sonnet-4-6", "min_volume": 50, "trends_max": 10, "recheck_days": 3,
                  "location_code": 2840, "benchmark": "gpts", "min_daily": 300, "related": True, "related_geo": "US",
                  "country_trends": True, "country_min_volume": 1000, "country_max": 8},
     "competition": {"max_rows": 8, "weak_dr": 30, "location_code": 2840},

@@ -30,10 +30,15 @@ VIRAL = 1000                # likes: a tutorial nobody shared is not a demand si
 SHARE = 0.25                # a format named in at least this share of the posts (and two of them) counts
 
 
+_DOMAIN = re.compile(r"^[\w-]+(\.[\w-]+)+$")
+
+
 def own_words(lead: dict) -> str:
-    """The thing's own words: its name, the examples, its maker's description."""
+    """The thing's own words: its name, the examples, its maker's description. A bare domain
+    is no example of what the thing makes: hotellobby.art is not an image."""
     about = lead.get("about") or ("", "")
-    return " ".join([lead.get("term", ""), *lead.get("examples", []), about[1] if isinstance(about, (list, tuple)) else ""])
+    examples = [e for e in lead.get("examples", []) if not _DOMAIN.match(e)]
+    return " ".join([lead.get("term", ""), *examples, about[1] if isinstance(about, (list, tuple)) else ""])
 
 
 def fmt(lead: dict) -> str:

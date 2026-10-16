@@ -1,6 +1,7 @@
 """Leads merged from every signal, and the two reports in Markdown."""
 from __future__ import annotations
 
+import os
 import re
 
 from . import opportunity, config, judge, usecases
@@ -10,7 +11,7 @@ SHOWN = 20
 OTHER_TERMS = 15
 POSTS_SHOWN = 3   # posts quoted in full per term
 # signal key -> label key, in the order of how early the signal comes
-KINDS = ["x", "hf", "breakout", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
+KINDS = ["x", "hf", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
 
 
 def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
@@ -33,7 +34,7 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
     for r in rows:
         r["known"] = config.known(cfg, r["term"])
         opportunity.tag(r)
-    status = judge.score(rows, cfg["judge"]["model"]) if rows else {"judged": 0}
+    status = judge.score(rows, cfg["judge"]["model"], cfg["judge"].get("focus", "names")) if rows else {"judged": 0}
     cut = cfg["judge"]["min_score"]
     # Earliest signal first among equals: a name the labs said today beats a sitemap echo.
     rows.sort(key=lambda r: (-(r.get("named", 0) >= cut), -len(r["kinds"]),
@@ -94,6 +95,8 @@ def topic_lines(cfg: dict, lead: list[dict], b: dict[str, dict], gsc: dict) -> l
 
 
 def _breakout_lines(bo: dict, cfg: dict) -> list[str]:
+    if bo.get("skipped"):
+        return []
     lines = ["", t("breakout_h", days=cfg["breakout"]["window_days"]), ""]
     repos = bo.get("repos") or []
     if not repos:
@@ -102,6 +105,24 @@ def _breakout_lines(bo: dict, cfg: dict) -> list[str]:
     return lines + [f"| {'🆕 ' if r.get('new') else ''}[{r['repo']}](https://github.com/{r['repo']}) | {r['stars']} | {r['velocity']} | "
                     f"{'+' + str(r['delta']) if r['delta'] is not None else t('dash')} | {r['age_days']} | "
                     f"{_cell(r['description'][:60])} |" for r in repos]
+
+
+def _domain_lines(dm: dict, cfg: dict) -> list[str]:
+    if dm.get("skipped"):
+        return []
+    lines = ["", t("domains_h", days=cfg["domains"]["window_days"]), ""]
+    rows = dm.get("terms") or []
+    if rows:
+        lines += [t("domains_cols"), "|---|---|---|---|---|---|"]
+        lines += [f"| **{r['term']}**{' 🤖' if r['intent'] else ''} | {r['domains']} | {r['tlds']} | ×{r['lift']} | {r['first_day'][5:]} | "
+                  f"{', '.join(r['examples'][:4])} |" for r in rows]
+    else:
+        lines.append(t("recent_none", why=dm.get("error") or t("domains_none")))
+    if dm.get("history_days") is not None and dm["history_days"] < 7:
+        lines += ["", t("domains_warm", days=dm["history_days"])]
+    if dm.get("errors"):
+        lines.append(t("domains_err", why="; ".join(dm["errors"][:3])))
+    return lines
 
 
 def _new_site_lines(ns: dict, cfg: dict) -> list[str]:
@@ -193,7 +214,7 @@ def pains(result: dict) -> str:
 
 
 def _gsc_lines(gsc: dict) -> list[str]:
-    if gsc.get("off"):
+    if gsc.get("off") or gsc.get("skipped"):
         return []
     lines = ["", t("gsc_h"), ""]
     if not gsc.get("queries"):
@@ -231,9 +252,9 @@ def _status_lines(b: dict[str, dict], extra: dict[str, dict]) -> list[str]:
     if not hf.get("skipped"):
         ok = "" if hf.get("error") else t("st_hf_ok", models=hf["models"], spaces=hf.get("spaces", 0)) + (t("st_first") if hf.get("first_run") else "")
         lines.append(t("st_hf", state=_state(hf, ok)))
-    ok = "" if bo.get("error") or bo.get("skipped") else t("st_breakout_ok", n=bo["searched"]) + \
-        (t("st_breakout_first") if bo.get("first_run") else "")
-    lines.append(t("st_breakout", state=_state(bo, ok)))
+    if not bo.get("skipped"):
+        ok = "" if bo.get("error") else t("st_breakout_ok", n=bo["searched"]) + (t("st_breakout_first") if bo.get("first_run") else "")
+        lines.append(t("st_breakout", state=_state(bo, ok)))
     ak = b.get("ask", {"skipped": True})
     if not ak.get("skipped"):
         lines.append(t("st_asks", state=_state(ak, "" if ak.get("error") else t("st_asks_ok", read=ak["read"], asks=ak["asks"]))))
@@ -242,6 +263,11 @@ def _status_lines(b: dict[str, dict], extra: dict[str, dict]) -> list[str]:
         ok = t("revenue_nokey_short") if rv.get("no_key") else "" if rv.get("error") else t("st_revenue_ok", n=rv["read"]) + \
             (t("st_first") if rv.get("first_run") else "")
         lines.append(t("st_revenue", state=_state(rv, ok) if not rv.get("no_key") else ok))
+    dm = b.get("domain", {"skipped": True})
+    if not dm.get("skipped"):
+        ok = "" if dm.get("error") else t("st_domains_ok", window=", ".join(d[5:] for d in dm["window"]), read=len(dm["read"]),
+                                            history=dm["history_days"])
+        lines.append(t("st_domains", state=_state(dm, ok)))
     for site, s in sm.get("sites", {}).items():
         state = s.get("error") or (t("st_site_first") if s.get("first_run") else t("st_site_ok", urls=s["urls"], new=s["new"]))
         lines.append(t("st_site", site=site, state=state))
@@ -273,6 +299,7 @@ def daily(cfg: dict, lead: list[dict], b: dict[str, dict], gsc: dict, rev: dict,
         lines += [f"- **{r['term']}**: {r['note']}" for r in rows] if rows \
             else [t("recent_none", why=recent.get("error") or t("no_new_names"))]
     lines += _breakout_lines(b["breakout"], cfg)
+    lines += _domain_lines(b.get("domain", {"skipped": True}), cfg)
     lines += _new_site_lines(b.get("newsite", {"skipped": True}), cfg)
     lines += _revenue_lines(b.get("revenue", {"skipped": True}), cfg)
     lines += _asks_lines(b.get("ask", {"skipped": True}), cfg)
@@ -336,8 +363,9 @@ def keyword_table(cfg: dict, uc: dict) -> list[str]:
     c = cfg["usecases"]
     if usecases.degraded(uc):
         lines += [t("uc_degraded"), ""]
-    lines += [t("uc_intro", names=", ".join(uc["names"]), proposed=uc["proposed"], relevant=uc["relevant"], kept=uc["kept"], min=c["min_volume"],
-                month=uc["volume_month"] or "?"),
+    intro = t("uc_intro", names=", ".join(uc["names"]), proposed=uc["proposed"], relevant=uc["relevant"], kept=uc["kept"],
+              min=c["min_volume"], month=uc["volume_month"] or "?") if uc.get("generic", True) else t("uc_intro_names", names=", ".join(uc["names"]))
+    lines += [intro,
               t("uc_bench", bench=uc["benchmark"], bench_daily=uc["bench_daily"]) if uc.get("bench_daily") else t("uc_bench_none", bench=uc["benchmark"]), "",
               t("uc_cols", bench=uc["benchmark"]), "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in uc["rows"]:
@@ -377,7 +405,7 @@ def keyword_table(cfg: dict, uc: dict) -> list[str]:
         lines += ["", t("uc_posts_err", why=uc["posts_error"])]
     if uc.get("related_errors"):
         lines += ["", t("uc_related_err", names="; ".join(uc["related_errors"]))]
-    elif not uc.get("related"):
+    elif not uc.get("related") and uc.get("generic", True):
         lines += ["", t("uc_related_off")]
     return lines
 
@@ -422,8 +450,48 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("x", "st_x"), ("hf", "st_hf")):
         if b[key].get("error"):
             lines.append(t(label, state=b[key]["error"]))
+    rs = b.get("rising", {"skipped": True})
+    if not rs.get("skipped"):
+        ok = "" if rs.get("error") else t("st_rising_ok", read=rs["read"], seeds=rs["seeds"], queries=rs["queries"],
+                                            left=rs["left"] if rs["left"] is not None else "?")
+        lines.append(t("st_rising", state=_state(rs, ok)) + ("; " + "; ".join(rs["errors"][:2]) if rs.get("errors") and not rs.get("error") else ""))
     for key, label in (("judge", "st_judge"), ("record", "st_record")):
         if extra.get(key, {}).get("error"):
             lines.append(t(label, state=extra[key]["error"]))
     lines.append(t("cost", cost=_cost(b["x"])))
     return "\n".join(lines) + "\n"
+
+
+def _trend(row: dict | None, bench: str) -> str:
+    """A name's curve in one line, from the keyword table: since when it rises, what it does now, its size."""
+    if not row or row.get("no_data"):
+        return ""
+    out = t("fs_trend", day=row["started"][5:]) if row.get("started") else ""
+    out += t("fs_now", now=t("uc_now_" + row["now"])) if row.get("now") else ""
+    if "peak_vs" in row:
+        out += t("fs_peak", bench=bench, peak=row["peak_vs"], level=row["bench_level"])
+    return out
+
+
+def push(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, dict]) -> tuple[str, str] | None:
+    """The Feishu message: (title, Markdown) with one line per new name from the pushed signals,
+    and a line for each of those signals that failed; None when there is neither."""
+    kinds = set(cfg["feishu"]["kinds"])
+    rows = [r for r in named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]][:SHOWN]
+    errors = [f"{t('kind_' + k)}: {v['error']}" for k, v in b.items() if k in kinds and v.get("error")]
+    if not rows and not errors:
+        return None
+    uc = extra.get("usecases") or {}
+    curve = {r["phrase"]: r for r in uc.get("rows", [])}
+    lines = []
+    for i, r in enumerate(rows, 1):
+        lines.append(f"{i}. **{r['term']}**{_marks(r)} · {'; '.join(r['signals'])}{_trend(curve.get(r['term']), uc.get('benchmark', ''))}")
+        if r["examples"]:
+            lines.append(f"    {', '.join(r['examples'][:3])}")
+    if errors:
+        lines += ["", t("fs_err", why="; ".join(errors))]
+    run = os.environ.get("GITHUB_RUN_ID")
+    if run:
+        url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{run}"
+        lines += ["", t("fs_link", url=url)]
+    return (t("fs_title", n=len(rows)) if rows else t("fs_alert")), "\n".join(lines)

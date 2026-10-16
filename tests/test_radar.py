@@ -232,7 +232,7 @@ def test_judge_failure_leaves_rows_unscored(monkeypatch):
 # --- merging the signals ---------------------------------------------------------------------
 
 def _no_judge(monkeypatch):
-    monkeypatch.setattr(report.judge, "score", lambda rows, model: {"judged": 0})
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
 
 
 def test_leads_merge_a_term_seen_by_two_signals(cfg, monkeypatch):
@@ -250,7 +250,7 @@ def test_leads_merge_a_term_seen_by_two_signals(cfg, monkeypatch):
 def test_names_lead_and_known_terms_are_not_recorded(cfg, monkeypatch):
     cfg["known_terms"] = ["Remotion"]
 
-    def score(rows, model):
+    def score(rows, model, focus="names"):
         for r in rows:
             r["named"] = {"dashboard": 0.1, "remotion skill": 0.9, "hyperframes": 0.95}[r["term"]]
         return {"judged": len(rows)}
@@ -806,7 +806,7 @@ def test_mcp_tools_answer_and_never_print(cfg, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli.sources, "x_new", lambda cfg, state: {"posts": 400, "cost_micros": 3000, "terms": [
         {"term": "qwen3.9", "recent": 2, "note": "X: 2 accounts", "examples": ["@a: Qwen3.9 is out"]}]})
     monkeypatch.setattr(cli.sources, "hf_new", lambda cfg, state: {"models": 100, "terms": []})
-    monkeypatch.setattr(report.judge, "score", lambda rows, model: {"judged": 0})
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
     ran = mcp_server._run("sources", [])
     assert ran["wrote_report"] and "**qwen3.9**" in ran["report_markdown"]
     assert capsys.readouterr().out == ""        # stdout is the protocol channel
@@ -1006,7 +1006,7 @@ def test_one_click_needs_a_tutorial_people_shared():
 
 
 def test_leads_carry_format_marks_and_the_legend(cfg, monkeypatch):
-    monkeypatch.setattr(report.judge, "score", lambda rows, model: {"judged": len(rows)})
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": len(rows)})
     blocks = {"x": {"terms": [{"term": "clipforge", "recent": 2, "note": "X", "examples": ["@a: clipforge animates any photo"],
                                "posts": [{"text": "here's how: step 1 upload, step 2 prompt", "likes": 2400}]}]}}
     lead, _ = report.leads(cfg, blocks)

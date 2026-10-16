@@ -6,8 +6,10 @@
 Signals:
   ① x         names the accounts you follow said for the first time (AIsa)
   ① hf        models new to Hugging Face's trending top 50
+  ① rising    searches Google Trends lists as rising around your seed words (SerpApi)
   ② breakout  one new GitHub repo taking off on its own
   ③ sitemaps  pages other sites added since the last run
+  ③ domains   words registered as domains by the dozen in the last days (newly registered domains, free)
   ③ newsites  domains registered in the last 90 days that already rank (weekly; AIsa)
   ⑥ revenue   products people pay for, growing fastest or newly listed (weekly; TrustMRR key)
   ⑦ asks      what people ask for on Reddit ("is there an AI tool that…"), sized (weekly; AIsa)
@@ -39,10 +41,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, gsc, new_sites, notify, pains, report, review, revenue, sitemaps, sources, store, usecases
+from . import asks, breakout, config, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, usecases
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "breakout", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"x", "hf", "rising", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -55,23 +57,27 @@ def run(fn, skip: bool = False) -> dict:
         return {"error": f"{type(exc).__name__}: {' '.join(str(exc).split())[:160]}"}
 
 
-def _finish(args, text: str, subject: str) -> None:
+def _finish(args, text: str, subject: str, push: tuple[str, str] | None = None) -> None:
     if args.out:
         Path(args.out).write_text(text)
     print(text)
     if args.mail:
         print(notify.send(subject, text))
+    if args.feishu and push:
+        print(notify.feishu(*push))
 
 
 def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
-              "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip)}
+              "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
+              "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
     conn = store.connect(state)
     extra = {"judge": judged, "record": run(lambda: {"recorded": store.record(conn, report.to_record(cfg, lead))})}
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
     if report.named(cfg, lead) or errors:
-        _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}")
+        _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}",
+                report.push(cfg, lead, blocks, extra))
     else:
         print(t("sources_quiet") + "; ".join(f"{k} {v.get('posts', v.get('models', t('dash')))}" for k, v in blocks.items()))
     return 0
@@ -83,6 +89,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
         "x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
         "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
         "breakout": run(lambda: breakout.breakouts(cfg, state), "breakout" in args.skip),
+        "domain": run(lambda: domains.diff(cfg, state), "domains" in args.skip),
         "sitemap": run(lambda: sitemaps.diff(cfg, state), "sitemaps" in args.skip),
         "newsite": run(lambda: new_sites.new_sites(cfg, state), "newsites" in args.skip or not weekly),
         "revenue": run(lambda: revenue.products(cfg, state), "revenue" in args.skip or not (
@@ -98,7 +105,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
     extra["tutorials"] = run(lambda: pains.tutorial_asks(cfg, report.named(cfg, lead)),
                              "tutorials" in args.skip or not cfg["tutorials"]["max_leads"])
     # With ① run apart, the daily report lists what that job kept since yesterday.
-    extra["recent_sources"] = run(lambda: {"rows": store.recent_sources(conn)}, not {"x", "hf"} <= args.skip)
+    extra["recent_sources"] = run(lambda: {"rows": store.recent_sources(conn)}, not {"x", "hf", "rising"} <= args.skip)
     # The names to read for their generic terms: things, not words that surged (usecases.names_to_read).
     names = usecases.names_to_read(report.to_record(cfg, lead), extra["recent_sources"].get("rows", []))
     repos = {r["term"]: r["repo"] for r in lead if r.get("repo")}
@@ -112,7 +119,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
     if args.out:
         Path(args.out).with_suffix(".json").write_text(json.dumps(
             {"leads": lead, **blocks, "gsc": found, "review": rev, "summary": summ, "keywords": extra["usecases"]}, ensure_ascii=False, indent=1, default=str))
-    _finish(args, text, f"New-term radar {date.today()}")
+    _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra))
     return 0
 
 
@@ -194,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--asks", action="store_true", help="run the weekly Reddit asks signal today")
     p.add_argument("--extension", action="append", default=[], metavar="ID", help="for `pains`: a Chrome extension to read the reviews of")
     p.add_argument("--mail", action="store_true", help="mail the report (see radar/notify.py)")
+    p.add_argument("--feishu", action="store_true", help="push the new names to Feishu (see radar/notify.py)")
     args = p.parse_args(argv)
     args.skip = {s for s in args.skip.split(",") if s}
     unknown = args.skip - SKIPPABLE
@@ -205,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "keywords" and not args.names:
         p.error("keywords: give at least one name")
     cfg = config.load(Path(args.config))
+    args.skip |= set(cfg["skip"])
+    if set(cfg["skip"]) - SKIPPABLE:
+        p.error(f"config.json skip: unknown {sorted(set(cfg['skip']) - SKIPPABLE)}")
     if "judge" in args.skip:
         cfg["judge"]["model"] = ""
     state.mkdir(parents=True, exist_ok=True)

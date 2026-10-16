@@ -1,0 +1,21 @@
+{
+  "lang": "zh",
+
+  "skip": ["x", "hf", "breakout", "sitemaps", "newsites", "revenue", "asks", "gsc", "tutorials"],
+
+  "x_accounts": {"labs": [], "bloggers": []},
+  "sitemaps": {},
+
+  "domains": {"window_days": 3, "history_days": 30, "min_domains": 3, "min_domains_ai": 2, "min_lift": 3, "min_len": 5, "max_terms": 25},
+  "rising": {
+    "seeds": ["higgsfield", "pixverse", "kling ai", "hailuo ai", "seedance", "dreamina", "viggle ai",
+              "ai video", "ai trend", "ai video generator"],
+    "window": "now 7-d", "min_rise": 1000, "reserve": 20
+  },
+  "feishu": {"kinds": ["domain", "rising"]},
+
+  "judge": {"model": "deepseek-chat", "focus": "trends", "min_score": 0.4},
+  "usecases": {"per_day": 10, "generic": false, "benchmark": "gpts"},
+  "competition": {"max_rows": 0},
+  "review": {"after_days": 14, "per_day": 5}
+}

@@ -1,9 +1,13 @@
-"""Mail a report (Markdown) through Resend. Optional.
+"""Send a report: by mail through Resend, or to a Feishu chat. Both optional.
 
-Environment: RESEND_API_KEY, EMAIL_FROM (an address on a domain you verified in Resend),
+Mail: RESEND_API_KEY, EMAIL_FROM (an address on a domain you verified in Resend),
 RADAR_EMAIL_TO (comma-separated for several). Without RADAR_EMAIL_TO it says so and does
 nothing: a missing recipient must not fail the run that produced the report.
 Needs the `markdown` package (pip install markdown).
+
+Feishu: a self-built app's bot (the way find-idea and gamerant-roblox-monitor send):
+FEISHU_APP_ID, FEISHU_APP_SECRET, FEISHU_RECEIVE_ID (a chat_id unless
+FEISHU_RECEIVE_ID_TYPE says otherwise). The message is a card with one Markdown element.
 """
 from __future__ import annotations
 
@@ -69,3 +73,43 @@ def send(subject: str, md_text: str) -> str:
             return f"mail sent ({res.status})"
     except urllib.error.HTTPError as exc:
         raise SystemExit(f"Resend {exc.code}: {exc.read().decode('utf-8', 'replace')[:300]}") from exc
+
+
+FEISHU = "https://open.feishu.cn/open-apis"
+CARD_CHARS = 15000
+
+
+def _feishu_post(url: str, body: dict, token: str = "", params: str = "") -> dict:
+    headers = {"Content-Type": "application/json; charset=utf-8", "User-Agent": UA}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url + params, data=json.dumps(body, ensure_ascii=False).encode(), method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            return json.load(res)
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"Feishu {exc.code}: {exc.read().decode('utf-8', 'replace')[:300]}") from exc
+
+
+def card(title: str, md_text: str) -> dict:
+    return {"config": {"wide_screen_mode": True},
+            "header": {"template": "blue", "title": {"tag": "plain_text", "content": title}},
+            "elements": [{"tag": "markdown", "content": md_text[:CARD_CHARS]}]}
+
+
+def feishu(title: str, md_text: str) -> str:
+    keys = ("FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_RECEIVE_ID")
+    if not all(os.environ.get(k) for k in keys):
+        return "feishu skipped: FEISHU_APP_ID, FEISHU_APP_SECRET or FEISHU_RECEIVE_ID not set"
+    auth = _feishu_post(f"{FEISHU}/auth/v3/tenant_access_token/internal",
+                        {"app_id": os.environ["FEISHU_APP_ID"], "app_secret": os.environ["FEISHU_APP_SECRET"]})
+    token = auth.get("tenant_access_token")
+    if not token:
+        raise SystemExit(f"Feishu token: code {auth.get('code')} {auth.get('msg', '')}")
+    kind = os.environ.get("FEISHU_RECEIVE_ID_TYPE", "chat_id")
+    sent = _feishu_post(f"{FEISHU}/im/v1/messages", {
+        "receive_id": os.environ["FEISHU_RECEIVE_ID"], "msg_type": "interactive",
+        "content": json.dumps(card(title, md_text), ensure_ascii=False)}, token, f"?receive_id_type={kind}")
+    if sent.get("code") != 0:
+        raise SystemExit(f"Feishu send: code {sent.get('code')} {sent.get('msg', '')}")
+    return "feishu sent"

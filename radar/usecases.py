@@ -481,14 +481,16 @@ def run(cfg: dict, state: Path, names: list[str], repos: dict[str, str], today: 
     todo = list(dict.fromkeys(names))[:ASKED_MAX] if on_request else due(names, seen, today, c["per_day"], c["recheck_days"])
     if not todo:
         return {"names": [], "rows": [], "proposed": 0, "cost_micros": 0}
-    ev, cost = evidence(todo, repos, today, texts)
+    # generic: false reads the names alone: their curve and size, no posts, phrases or volumes.
+    generic_on = c.get("generic", True)
+    ev, cost = evidence(todo, repos, today, texts) if generic_on else ({n: {"posts": [], "readme": "", "repo": ""} for n in todo}, 0)
     proposed: dict[str, dict] = {}
     asked, c0 = 0, 0
     tails: dict[str, list[str]] = {}
     cosearch: list[dict] = []
     related_errors: list[str] = []
-    use_related = bool(goanyapi.key()) and c.get("related", True)
-    for name in todo:
+    use_related = generic_on and bool(goanyapi.key()) and c.get("related", True)
+    for name in todo if generic_on else []:
         cands = [dict(u, source="model") for u in propose(c["model"], name, ev[name])]
         if use_related:
             try:
@@ -528,14 +530,15 @@ def run(cfg: dict, state: Path, names: list[str], repos: dict[str, str], today: 
         snap.save(path, {n: s for n, s in seen.items() if s["first"] >= cutoff})
     return {"names": todo, "rows": rows, "proposed": asked, "relevant": len(proposed), "kept": len(generic), "benchmark": bench,
             "bench_daily": round(daily) if daily else None, "volume_month": next((r["month"] for r in generic if r.get("month")), ""),
-            "no_evidence": [n for n in todo if not ev[n]["posts"] and not ev[n]["readme"]],
+            "generic": generic_on,
+            "no_evidence": [n for n in todo if generic_on and not ev[n]["posts"] and not ev[n]["readme"]],
             "posts_error": "; ".join(f"{n}: {e['error']}" for n, e in ev.items() if e.get("error")),
             "related": use_related, "tails": {n: v for n, v in tails.items() if v}, "cosearch": cosearch,
             "related_errors": related_errors, "geo": c["related_geo"], "country_errors": local_errors,
             "competition_errors": comp_errors, "cost_micros": cost + c0 + c2 + c3 + c4 + c5}
 
 
-READ_KINDS = {"x", "hf", "breakout", "newsite", "revenue"}
+READ_KINDS = {"x", "hf", "rising", "breakout", "newsite", "revenue", "domain"}
 READ_MIN = 0.8
 
 

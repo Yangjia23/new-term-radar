@@ -2,6 +2,9 @@
 Trends and whois data through DataForSEO) and its OpenAI-compatible chat endpoint (the
 name judge). One key: AISA_API_KEY, or the one the AIsa CLI stores when you log in.
 
+The chat can go to DeepSeek instead: with DEEPSEEK_API_KEY set, a model named deepseek-...
+("deepseek-chat") is asked at DeepSeek's own OpenAI-compatible endpoint.
+
 The tool router runs a batch's calls one by one, about 10 s each, so batches are kept to
 BATCH calls and the timeout is long. Every call is billed: a failed batch is never
 retried here, so one bad day costs one batch at most.
@@ -21,6 +24,7 @@ from . import UA
 
 ROUTER = os.environ.get("AISA_ROUTER_BASE_URL", "https://tools.aisa.one") + "/v1/tool-router/aisa-batch-use"
 CHAT = os.environ.get("AISA_API_BASE_URL", "https://api.aisa.one") + "/v1/chat/completions"
+DEEPSEEK_CHAT = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com") + "/v1/chat/completions"
 MAX_CALLS = 20      # the router's own limit per batch
 BATCH = 5           # what call_all sends at once, about 50 s a batch
 TIMEOUT = 240
@@ -51,9 +55,9 @@ def _no_key() -> str:
     raise AisaError("no AIsa key: set AISA_API_KEY, or log in with the AIsa CLI (`aisa login`)")
 
 
-def _post(url: str, body: dict, timeout: int) -> dict:
+def _post(url: str, body: dict, timeout: int, token: str = "") -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers={
-        "Content-Type": "application/json", "Authorization": f"Bearer {key()}",
+        "Content-Type": "application/json", "Authorization": f"Bearer {token or key()}",
         "User-Agent": UA, "x-aisa-source": "new-term-radar"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
@@ -93,8 +97,9 @@ def call_all(calls: list[dict]) -> tuple[dict[str, dict], int]:
 
 
 def chat(model: str, system: str, user: str, max_tokens: int = 1500) -> str:
-    body = _post(CHAT, {"model": model, "temperature": 0, "max_tokens": max_tokens, "messages": [
-        {"role": "system", "content": system}, {"role": "user", "content": user}]}, CHAT_TIMEOUT)
+    deepseek = os.environ.get("DEEPSEEK_API_KEY", "").strip() if model.startswith("deepseek-") else ""
+    body = _post(DEEPSEEK_CHAT if deepseek else CHAT, {"model": model, "temperature": 0, "max_tokens": max_tokens, "messages": [
+        {"role": "system", "content": system}, {"role": "user", "content": user}]}, CHAT_TIMEOUT, deepseek)
     try:
         return body["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError) as exc:
