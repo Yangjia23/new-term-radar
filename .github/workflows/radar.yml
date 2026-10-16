@@ -78,7 +78,7 @@ jobs:
           FEISHU_RECEIVE_ID: ${{ secrets.FEISHU_RECEIVE_ID }}
         run: |
           if [ "$COMMAND" = "daily" ]; then
-            python -m radar daily --skip x,hf,rising --out report.md ${RADAR_EMAIL_TO:+--mail} ${FEISHU_APP_ID:+--feishu}
+            python -m radar daily --skip x,hf,tiktok,rising --out report.md ${RADAR_EMAIL_TO:+--mail} ${FEISHU_APP_ID:+--feishu}
           else
             python -m radar sources --out report.md ${RADAR_EMAIL_TO:+--mail} ${FEISHU_APP_ID:+--feishu}
           fi

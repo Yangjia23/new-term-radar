@@ -7,6 +7,7 @@ Signals:
   ① x         names the accounts you follow said for the first time (AIsa)
   ① hf        models new to Hugging Face's trending top 50
   ① rising    searches Google Trends lists as rising around your seed words (SerpApi)
+  ① tiktok    hashtags new to TikTok's trending top 100 (AIsa)
   ② breakout  one new GitHub repo taking off on its own
   ③ sitemaps  pages other sites added since the last run
   ③ domains   words registered as domains by the dozen in the last days (newly registered domains, free)
@@ -41,10 +42,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, usecases
+from . import asks, breakout, config, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "rising", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"x", "hf", "tiktok", "rising", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -70,6 +71,7 @@ def _finish(args, text: str, subject: str, push: tuple[str, str] | None = None) 
 def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
               "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
+              "tiktok": run(lambda: tiktok.trending(cfg, state), "tiktok" in args.skip),
               "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
     conn = store.connect(state)
@@ -105,7 +107,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
     extra["tutorials"] = run(lambda: pains.tutorial_asks(cfg, report.named(cfg, lead)),
                              "tutorials" in args.skip or not cfg["tutorials"]["max_leads"])
     # With ① run apart, the daily report lists what that job kept since yesterday.
-    extra["recent_sources"] = run(lambda: {"rows": store.recent_sources(conn)}, not {"x", "hf", "rising"} <= args.skip)
+    extra["recent_sources"] = run(lambda: {"rows": store.recent_sources(conn)}, not {"x", "hf", "tiktok", "rising"} <= args.skip)
     # The names to read for their generic terms: things, not words that surged (usecases.names_to_read).
     names = usecases.names_to_read(report.to_record(cfg, lead), extra["recent_sources"].get("rows", []))
     repos = {r["term"]: r["repo"] for r in lead if r.get("repo")}

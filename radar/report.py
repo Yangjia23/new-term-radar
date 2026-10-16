@@ -11,7 +11,7 @@ SHOWN = 20
 OTHER_TERMS = 15
 POSTS_SHOWN = 3   # posts quoted in full per term
 # signal key -> label key, in the order of how early the signal comes
-KINDS = ["x", "hf", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
+KINDS = ["x", "hf", "tiktok", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
 
 
 def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
@@ -20,7 +20,11 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
     out: dict[str, dict] = {}
     for kind, block in blocks.items():
         for r in block.get("terms", []):
-            row = out.setdefault(r["term"], {"term": r["term"], "kinds": [], "signals": [], "examples": [], "variants": [], "posts": []})
+            # "burning bridges" from a domain and "burningbridges" from a hashtag are one lead, shown with its spaces.
+            row = out.setdefault(r["term"].replace(" ", ""), {"term": r["term"], "kinds": [], "signals": [], "examples": [],
+                                                              "variants": [], "posts": []})
+            if " " in r["term"] and " " not in row["term"]:
+                row["term"] = r["term"]
             row["kinds"].append(kind)
             row["signals"].append(r.get("note") or t("note_surge", label=t(f"kind_{kind}"), n=r["recent"], lift=r["lift"]))
             row["examples"] += r.get("examples", [])
@@ -450,6 +454,10 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("x", "st_x"), ("hf", "st_hf")):
         if b[key].get("error"):
             lines.append(t(label, state=b[key]["error"]))
+    tk = b.get("tiktok", {"skipped": True})
+    if not tk.get("skipped"):
+        ok = "" if tk.get("error") else t("st_tiktok_ok", read=tk["read"]) + (t("st_first") if tk.get("first_run") else "")
+        lines.append(t("st_tiktok", state=_state(tk, ok)))
     rs = b.get("rising", {"skipped": True})
     if not rs.get("skipped"):
         ok = "" if rs.get("error") else t("st_rising_ok", read=rs["read"], seeds=rs["seeds"], queries=rs["queries"],
@@ -458,7 +466,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("judge", "st_judge"), ("record", "st_record")):
         if extra.get(key, {}).get("error"):
             lines.append(t(label, state=extra[key]["error"]))
-    lines.append(t("cost", cost=_cost(b["x"])))
+    lines.append(t("cost", cost=_cost(b["x"], b.get("tiktok", {}))))
     return "\n".join(lines) + "\n"
 
 

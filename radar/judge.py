@@ -46,7 +46,9 @@ SYSTEM_TRENDS = (
     "Score low (0.0 to 0.2): a company, startup, product, app or SaaS name ('victoriaalpha', 'listkit', 'aha creators'); a "
     "betting, loan, crypto or shop brand ('886bet', 'sportbonustop', 'extrade'); an ordinary word or name in any language, "
     "or a place ('tools', 'world', 'robot', 'diary', 'fellside', 'stednjiste'); a generic AI category ('super intelligence', "
-    "'ai girlfriend'); news about a company ('openai contractors terminated'); a feature or a plan ('pricing', 'login').\n"
+    "'ai girlfriend'); news about a company ('openai contractors terminated'); a feature or a plan ('pricing', 'login'); "
+    "adult or sexual content; a name in Chinese pinyin or anything made for Chinese-speaking users ('huangguo', 'duanju'); "
+    "news, sports and holidays ('hurricane isaias', 'chicago marathon', 'columbus day').\n"
     "When it is unclear whether the term is a trend, give 0.3 to 0.5.\n"
     "Answer with JSON only, one object per term, in the same order: [{\"i\": 0, \"score\": 0.9}, ...]"
 )

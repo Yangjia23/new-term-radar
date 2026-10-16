@@ -1,0 +1,70 @@
+"""Signal ① tiktok (trending hashtags through AIsa) and the blocklist. No network."""
+import copy
+from datetime import date
+
+from radar import config, report, tiktok
+
+TODAY = date(2026, 10, 16)
+
+
+def _page(tags):
+    return {"data": {"items": [{"hashtagName": tag, "publishCnt": n} for tag, n in tags]}}
+
+
+def _cfg():
+    c = copy.deepcopy(config.DEFAULTS)
+    c["tiktok"]["countries"] = ["US"]
+    c["tiktok"]["pages"] = 1
+    return c
+
+
+def _answer(monkeypatch, tags):
+    calls = []
+
+    def call(batch):
+        calls.append(batch)
+        return {b["call_id"]: _page(tags) for b in batch}, 1000 * len(batch)
+    monkeypatch.setattr(tiktok.aisa, "call", call)
+    return calls
+
+
+def test_core_cuts_a_tag_like_a_domain():
+    assert tiktok.core("burningbridgesai") == "burningbridges"
+    assert tiktok.core("#bulin47challenge") == "bulin47"
+    assert tiktok.core("hotellobbytrend") == "hotellobby"
+
+
+def test_the_first_run_keeps_the_chart_and_later_runs_report_what_entered_it(tmp_path, monkeypatch):
+    calls = _answer(monkeypatch, [("marvelrivalsavengers", 108935), ("bulin47", 13815)])
+    first = tiktok.trending(_cfg(), tmp_path, TODAY)
+    assert first["first_run"] and first["terms"] == [] and first["read"] == 2
+    assert calls[0][0]["arguments"]["body"] == {"country_code": "US", "time_range": 7, "page": 1, "limit": 50}
+    _answer(monkeypatch, [("bulin47", 14000), ("burningbridgesai", 3193), ("bulin47challenge", 4567)])
+    terms = {r["term"]: r for r in tiktok.trending(_cfg(), tmp_path, TODAY)["terms"]}
+    assert set(terms) == {"burningbridges", "bulin47"} and terms["bulin47"]["examples"] == ["#bulin47challenge"]
+    assert terms["burningbridges"]["note"] == "TikTok: #burningbridgesai new in the US top 100 at #2 (3,193 posts)"
+
+
+def test_a_hashtag_and_a_domain_wave_are_one_lead_with_the_spaced_name(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
+    blocks = {"tiktok": {"terms": [{"term": "burningbridges", "note": "TikTok: #burningbridgesai", "examples": ["#burningbridgesai"]}]},
+              "domain": {"terms": [{"term": "burning bridges", "note": "New domains: 12", "examples": ["burningbridges.ai"]}]}}
+    lead, _ = report.leads(cfg, blocks)
+    assert len(lead) == 1 and lead[0]["term"] == "burning bridges" and lead[0]["kinds"] == ["tiktok", "domain"]
+
+
+def test_a_failed_country_says_so(tmp_path, monkeypatch):
+    def down(batch):
+        raise tiktok.aisa.AisaError("HTTP 502")
+    monkeypatch.setattr(tiktok.aisa, "call", down)
+    assert tiktok.trending(_cfg(), tmp_path, TODAY)["error"] == "US: HTTP 502"
+    assert tiktok.trending(copy.deepcopy(config.DEFAULTS), tmp_path, TODAY) == {"skipped": True}
+
+
+def test_a_blocklisted_term_is_never_pushed(cfg, monkeypatch):
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
+    cfg["blocklist"] = ["huangguo"]
+    block = {"terms": [{"term": t, "note": "New domains: 5", "examples": [f"{t.replace(' ', '')}.ai"]} for t in ("huangguo", "huangguodj", "bulin 47")]}
+    lead, _ = report.leads(cfg, {"domain": block})
+    title, text = report.push(cfg, lead, {"domain": block}, {})
+    assert title == "New-term radar · 1 new" and "bulin 47" in text and "huangguo" not in text

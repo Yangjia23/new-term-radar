@@ -12,7 +12,10 @@
               "ai video", "ai trend", "ai video generator"],
     "window": "now 7-d", "min_rise": 1000, "reserve": 20
   },
-  "feishu": {"kinds": ["domain", "rising"]},
+  "tiktok": {"countries": ["US"], "pages": 2, "days": 7},
+  "feishu": {"kinds": ["domain", "rising", "tiktok"]},
+
+  "blocklist": ["huangguo"],
 
   "judge": {"model": "deepseek-chat", "focus": "trends", "min_score": 0.4},
   "usecases": {"per_day": 10, "generic": false, "benchmark": "gpts"},
