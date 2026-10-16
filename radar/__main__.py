@@ -42,10 +42,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
+from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "tiktok", "rising", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"x", "hf", "tiktok", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -68,6 +68,12 @@ def _finish(args, text: str, subject: str, push: tuple[str, str] | None = None) 
         print(notify.feishu(*push))
 
 
+def _live(args, cfg: dict, lead: list[dict]) -> dict:
+    """CT lookups for the names about to be pushed: how many of their sites are live, since when."""
+    rows = report.to_push(cfg, lead)
+    return run(lambda: ct.check(rows, cfg["ct"]), "ct" in args.skip or not args.feishu or not rows or not cfg["ct"]["max_lookups"])
+
+
 def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
               "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
@@ -78,6 +84,7 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
     extra = {"judge": judged, "record": run(lambda: {"recorded": store.record(conn, report.to_record(cfg, lead))})}
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
     if report.named(cfg, lead) or errors:
+        extra["ct"] = _live(args, cfg, lead)
         _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}",
                 report.push(cfg, lead, blocks, extra))
     else:
@@ -121,6 +128,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
     if args.out:
         Path(args.out).with_suffix(".json").write_text(json.dumps(
             {"leads": lead, **blocks, "gsc": found, "review": rev, "summary": summ, "keywords": extra["usecases"]}, ensure_ascii=False, indent=1, default=str))
+    extra["ct"] = _live(args, cfg, lead)
     _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra))
     return 0
 

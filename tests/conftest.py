@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from radar import aisa, config, domains, goanyapi, i18n, rising
+from radar import aisa, config, ct, domains, goanyapi, i18n, rising
 
 
 @pytest.fixture(autouse=True)
@@ -26,6 +26,10 @@ def english(monkeypatch):
         raise rising.SerpError("no network in tests")
     monkeypatch.setattr(rising, "_get", no_search)
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    def no_lookup(*a, **k):
+        raise OSError("no network in tests")
+    monkeypatch.setattr(ct, "issued", no_lookup)
     # The page-one check runs only in the tests that set it up, whatever loads the config (the MCP server too).
     monkeypatch.setitem(config.DEFAULTS["competition"], "max_rows", 0)
     monkeypatch.setitem(config.DEFAULTS["asks"], "weekday", None)          # weekly signals stay off unless a test asks

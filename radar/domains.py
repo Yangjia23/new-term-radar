@@ -23,6 +23,12 @@ The rules, set against the domains registered for 13 AI trends of September and 
 The lists are kept per day in the state directory (the cores and their domains, gzip JSON,
 a few hundred KB a day), which is what the history is read from. WhoisDS keeps only the last
 four days online, so the history starts the day the radar first runs.
+
+A list is not of the day it is named after. Sampled in October 2026, the list of the 14th
+held .com domains registered on the 12th, and the list of Tuesday the 13th those of the
+weekend before, the 10th and 11th. So each list's days are measured, not assumed: SAMPLE of
+its .com domains are looked up at Verisign's RDAP (free) when it is read, and a wave is
+labelled with the registration days of the lists it is in.
 """
 from __future__ import annotations
 
@@ -31,6 +37,8 @@ import io
 import re
 import urllib.request
 import zipfile
+import json
+import random
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -42,6 +50,9 @@ INDEX = "https://www.whoisds.com/newly-registered-domains"
 _LINK = re.compile(r"newly-registered-domains/([A-Za-z0-9+/]+=*)/nrd")
 TIMEOUT = 180
 EXAMPLES = 6
+RDAP = "https://rdap.verisign.com/com/v1/domain/"
+SAMPLE = 8
+RECENT_DAYS = 10    # a sampled domain registered longer ago than this was re-registered, not new
 INTENT = {"ai", "ia", "video", "videos", "aivideo", "videoai"}
 # Cut off around the name, as a word between hyphens or glued to either end. "ia" (Spanish
 # for AI) only between hyphens: glued, it is the end of media, india, academia.
@@ -199,6 +210,30 @@ def download(url: str) -> list[str]:
         return z.read(name).decode("utf-8", "replace").split()
 
 
+def registered(domain: str) -> str | None:
+    """The day a .com domain was registered, from Verisign's RDAP."""
+    try:
+        data = json.loads(_get(RDAP + domain))
+    except (OSError, ValueError):
+        return None
+    return next((e["eventDate"][:10] for e in data.get("events", []) if e.get("eventAction") == "registration"), None)
+
+
+def days_of(day: str, domains: list[str]) -> list[str]:
+    """The registration days a list holds, measured on a sample of its .com domains."""
+    coms = sorted(d for d in domains if d.endswith(".com"))
+    sample = random.Random(day).sample(coms, min(SAMPLE, len(coms)))
+    floor = (date.fromisoformat(day) - timedelta(days=RECENT_DAYS)).isoformat()
+    found = Counter(r for r in map(registered, sample) if r and r >= floor)
+    # the days that hold a real share of the sample, not one stray domain
+    return sorted(d for d, n in found.items() if n >= max(2, len(sample) // 4)) or sorted(found)[:1]
+
+
+def span(days: list[str]) -> str:
+    """"10-14" or "10-10~10-11"."""
+    return days[0][5:] if days[0] == days[-1] else f"{days[0][5:]}~{days[-1][5:]}"
+
+
 def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
     """Reads the lists not read yet, keeps them per day, and reports the cores of the window."""
     c = cfg["domains"]
@@ -207,6 +242,8 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
     kept = {p.name[:10]: p for p in folder.glob("????-??-??.json.gz")} if folder.exists() else {}
     first_run = not kept
     errors, read = [], []
+    mpath = folder / "registered.json.gz"
+    measured: dict[str, list[str]] = snap.load(mpath) or {}
     try:
         online = available()
     except Exception as exc:  # noqa: BLE001 — the history on disk still makes a report
@@ -216,12 +253,14 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
         if day in kept:
             continue
         try:
-            snap.save(folder / f"{day}.json.gz", group(download(url), c["min_len"]))
+            listed = download(url)
+            snap.save(folder / f"{day}.json.gz", group(listed, c["min_len"]))
         except Exception as exc:  # noqa: BLE001 — that day is tried again next run
             errors.append(f"{day}: {type(exc).__name__}: {str(exc)[:100]}")
             continue
         kept[day] = folder / f"{day}.json.gz"
         read.append(day)
+        measured[day] = days_of(day, listed)
     if not kept:
         return {"error": "; ".join(errors) or t("domains_none_online"), "terms": []}
     cutoff = (today - timedelta(days=c["history_days"] + c["window_days"])).isoformat()
@@ -234,10 +273,15 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
     rows = find([snap.load(kept[d]) for d in win_days], [snap.load(kept[d]) for d in past_days], c, set(reported))
     for r in rows:
         r["first_day"] = win_days[r.pop("first")]
-        r["note"] = t("note_domain", n=r["domains"], tlds=r["tlds"], day=r["first_day"][5:])
+        regs = sorted({d for day in win_days[win_days.index(r["first_day"]):] for d in measured.get(day, [])})
+        r["registered"] = span(regs) if regs else ""
+        r["note"] = t("note_domain", n=r["domains"], tlds=r["tlds"], day=r["registered"]) if regs else \
+            t("note_domain_list", n=r["domains"], tlds=r["tlds"], day=r["first_day"][5:])
         reported[r["core"]] = today.isoformat()
     snap.save(rpath, reported)
-    out = {"read": read, "window": win_days, "history_days": len(past_days), "first_run": first_run, "terms": rows}
+    snap.save(mpath, {d: v for d, v in measured.items() if d in kept})
+    out = {"read": read, "window": win_days, "history_days": len(past_days), "first_run": first_run, "terms": rows,
+           "registered": {d: measured.get(d, []) for d in win_days}}
     if errors:
         out["errors"] = errors
     return out

@@ -27,6 +27,7 @@ DEFAULTS = {
                 "max_terms": 25},
     "rising": {"seeds": [], "window": "now 7-d", "geo": "", "min_rise": 1000, "reserve": 20},   # needs SERPAPI_API_KEY
     "tiktok": {"countries": [], "pages": 2, "days": 7},     # trending hashtags, through AIsa
+    "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run
     "feishu": {"kinds": ["domain", "rising", "tiktok"]},     # the signals whose new names are pushed to Feishu
     "usecases": {"per_day": 5, "generic": True, "model": "claude-sonnet-4-6", "min_volume": 50, "trends_max": 10, "recheck_days": 3,
                  "location_code": 2840, "benchmark": "gpts", "min_daily": 300, "related": True, "related_geo": "US",

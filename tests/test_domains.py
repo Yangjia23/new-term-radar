@@ -65,14 +65,23 @@ def test_an_everyday_word_takes_no_variants():
     assert row["domains"] == 3                                               # its own three, not worldsbykai and the rest
 
 
+def test_a_list_is_labelled_with_the_days_its_domains_were_registered(monkeypatch):
+    when = {f"d{i}.com": day for i, day in enumerate(["2026-10-10"] * 5 + ["2026-10-11"] * 2 + ["2023-10-12"])}
+    monkeypatch.setattr(domains, "registered", lambda d: when.get(d))
+    assert domains.days_of("2026-10-13", list(when) + ["x.net"]) == ["2026-10-10", "2026-10-11"]   # not the 2023 one
+    assert domains.span(["2026-10-10", "2026-10-11"]) == "10-10~10-11" and domains.span(["2026-10-14"]) == "10-14"
+
+
 def test_diff_keeps_each_list_reports_once_and_survives_a_bad_day(tmp_path, monkeypatch):
     cfg = {"domains": C}
+    monkeypatch.setattr(domains, "days_of", lambda day, listed: [(date.fromisoformat(day) - timedelta(days=2)).isoformat()])
     lists = {"2026-10-14": "u1", "2026-10-15": "u2", "2026-10-16": "u3"}
     monkeypatch.setattr(domains, "available", lambda: lists)
     monkeypatch.setattr(domains, "download", lambda url: WAVE if url == "u3" else ["quiet.com"])
     first = domains.diff(cfg, tmp_path, TODAY)
     assert first["first_run"] and first["read"] == list(lists) and first["window"] == list(lists)
     assert {r["core"] for r in first["terms"]} >= {"hotellobby", "bulin47"} and first["terms"][0]["first_day"] == "2026-10-16"
+    assert first["terms"][0]["registered"] == "10-14" and first["terms"][0]["note"].endswith("registered 10-14")
     again = domains.diff(cfg, tmp_path, TODAY)
     assert again["read"] == [] and again["terms"] == []                     # kept on disk, and reported already
 
@@ -96,7 +105,7 @@ def test_diff_with_nothing_online_and_nothing_kept_says_so(tmp_path, monkeypatch
 def _lead(cfg, rows):
     block = {"window": ["2026-10-14", "2026-10-15", "2026-10-16"], "read": ["2026-10-16"], "history_days": 2, "terms": rows}
     for r in rows:
-        r.update(first_day="2026-10-16", note=f"New domains: {r['domains']} ({r['tlds']} TLDs) since 10-16")
+        r.update(first_day="2026-10-16", registered="10-14", note=f"New domains: {r['domains']} ({r['tlds']} TLDs), registered 10-14")
     lead, _ = report.leads(cfg, {"domain": block})
     return lead, block
 
@@ -104,7 +113,7 @@ def _lead(cfg, rows):
 def test_the_daily_report_lists_the_waves(cfg):
     lead, block = _lead(cfg, domains.find([domains.group(WAVE)], [], C))
     text = "\n".join(report._domain_lines(block, cfg))
-    assert "| **hotel lobby** 🤖 | 7 | 6 | ×6.0 | 10-16 |" in text and "History: 2 days of lists. Under a week" in text
+    assert "| **hotel lobby** 🤖 | 7 | 6 | ×6.0 | 10-14 |" in text and "History: 2 days of lists. Under a week" in text
 
 
 def test_push_has_one_line_per_new_name_with_its_curve(cfg, monkeypatch):
@@ -114,7 +123,7 @@ def test_push_has_one_line_per_new_name_with_its_curve(cfg, monkeypatch):
     uc = {"benchmark": "gpts", "rows": [{"phrase": "hotel lobby", "started": "2026-10-12", "now": "rising", "peak_vs": 51, "bench_level": 40}]}
     title, text = report.push(cfg, lead, {"domain": block}, {"usecases": uc})
     assert title == "New-term radar · 7 new"
-    assert "**hotel lobby** · New domains: 7 (6 TLDs) since 10-16 · rising since 10-12 · still rising · peak vs gpts: 51 vs 40\n" \
+    assert "**hotel lobby** · New domains: 7 (6 TLDs), registered 10-14 · rising since 10-12 · still rising · peak vs gpts: 51 vs 40\n" \
            "    hotellobby.ai, aihotellobby.art, hotellobbyai.com" in text
     assert "[Full report](https://github.com/me/radar/actions/runs/42)" in text
 

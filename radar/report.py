@@ -5,6 +5,7 @@ import os
 import re
 
 from . import opportunity, config, judge, usecases
+from .domains import span
 from .i18n import t
 
 SHOWN = 20
@@ -118,7 +119,8 @@ def _domain_lines(dm: dict, cfg: dict) -> list[str]:
     rows = dm.get("terms") or []
     if rows:
         lines += [t("domains_cols"), "|---|---|---|---|---|---|"]
-        lines += [f"| **{r['term']}**{' 🤖' if r['intent'] else ''} | {r['domains']} | {r['tlds']} | ×{r['lift']} | {r['first_day'][5:]} | "
+        lines += [f"| **{r['term']}**{' 🤖' if r['intent'] else ''} | {r['domains']} | {r['tlds']} | ×{r['lift']} | "
+                  f"{r.get('registered') or t('dash')} | "
                   f"{', '.join(r['examples'][:4])} |" for r in rows]
     else:
         lines.append(t("recent_none", why=dm.get("error") or t("domains_none")))
@@ -269,8 +271,9 @@ def _status_lines(b: dict[str, dict], extra: dict[str, dict]) -> list[str]:
         lines.append(t("st_revenue", state=_state(rv, ok) if not rv.get("no_key") else ok))
     dm = b.get("domain", {"skipped": True})
     if not dm.get("skipped"):
+        regs = "; ".join(f"{d[5:]}→{span(v) if v else '?'}" for d, v in (dm.get("registered") or {}).items())
         ok = "" if dm.get("error") else t("st_domains_ok", window=", ".join(d[5:] for d in dm["window"]), read=len(dm["read"]),
-                                            history=dm["history_days"])
+                                            history=dm["history_days"], regs=regs or "?")
         lines.append(t("st_domains", state=_state(dm, ok)))
     for site, s in sm.get("sites", {}).items():
         state = s.get("error") or (t("st_site_first") if s.get("first_run") else t("st_site_ok", urls=s["urls"], new=s["new"]))
@@ -481,19 +484,35 @@ def _trend(row: dict | None, bench: str) -> str:
     return out
 
 
+def to_push(cfg: dict, lead: list[dict]) -> list[dict]:
+    """The new names of the pushed signals that the judge kept and the blocklist lets through."""
+    kinds = set(cfg["feishu"]["kinds"])
+    return [r for r in named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]][:SHOWN]
+
+
+def _ct(found: dict | None) -> str:
+    if not found:
+        return ""
+    if not found["live"]:
+        return t("fs_ct_none", checked=found["checked"])
+    return t("fs_ct", live=found["live"], checked=found["checked"], first=found["first"][5:])
+
+
 def push(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, dict]) -> tuple[str, str] | None:
     """The Feishu message: (title, Markdown) with one line per new name from the pushed signals,
     and a line for each of those signals that failed; None when there is neither."""
     kinds = set(cfg["feishu"]["kinds"])
-    rows = [r for r in named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]][:SHOWN]
+    rows = to_push(cfg, lead)
     errors = [f"{t('kind_' + k)}: {v['error']}" for k, v in b.items() if k in kinds and v.get("error")]
     if not rows and not errors:
         return None
     uc = extra.get("usecases") or {}
     curve = {r["phrase"]: r for r in uc.get("rows", [])}
+    live = (extra.get("ct") or {}).get("names", {})
     lines = []
     for i, r in enumerate(rows, 1):
-        lines.append(f"{i}. **{r['term']}**{_marks(r)} · {'; '.join(r['signals'])}{_trend(curve.get(r['term']), uc.get('benchmark', ''))}")
+        lines.append(f"{i}. **{r['term']}**{_marks(r)} · {'; '.join(r['signals'])}{_trend(curve.get(r['term']), uc.get('benchmark', ''))}"
+                     f"{_ct(live.get(r['term']))}")
         if r["examples"]:
             lines.append(f"    {', '.join(r['examples'][:3])}")
     if errors:
