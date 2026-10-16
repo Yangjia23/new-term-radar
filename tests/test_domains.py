@@ -84,6 +84,8 @@ def test_diff_keeps_each_list_reports_once_and_survives_a_bad_day(tmp_path, monk
     assert first["terms"][0]["registered"] == "10-14" and first["terms"][0]["note"].endswith("registered 10-14")
     again = domains.diff(cfg, tmp_path, TODAY)
     assert again["read"] == [] and again["terms"] == []                     # kept on disk, and reported already
+    (tmp_path / "domains" / "registered.json.gz").unlink()
+    assert domains.diff(cfg, tmp_path, TODAY)["registered"]["2026-10-16"] == ["2026-10-14"]   # measured from what was kept
 
     def broken(url):
         raise OSError("timed out")

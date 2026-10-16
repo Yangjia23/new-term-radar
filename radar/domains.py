@@ -268,6 +268,9 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
         kept.pop(day).unlink(missing_ok=True)
     days = sorted(kept)
     win_days, past_days = days[-c["window_days"]:], days[:-c["window_days"]]
+    for day in win_days:          # a list kept before its days were measured: measure it from what was kept
+        if day not in measured:
+            measured[day] = days_of(day, [d for ds in snap.load(kept[day]).values() for d in ds])
     rpath = folder / "reported.json.gz"
     reported = {k: d for k, d in (snap.load(rpath) or {}).items() if d >= (today - timedelta(days=c["history_days"])).isoformat()}
     rows = find([snap.load(kept[d]) for d in win_days], [snap.load(kept[d]) for d in past_days], c, set(reported))
