@@ -48,7 +48,9 @@ SYSTEM_TRENDS = (
     "or a place ('tools', 'world', 'robot', 'diary', 'fellside', 'stednjiste'); a generic AI category ('super intelligence', "
     "'ai girlfriend'); news about a company ('openai contractors terminated'); a feature or a plan ('pricing', 'login'); "
     "adult or sexual content; a name in Chinese pinyin or anything made for Chinese-speaking users ('huangguo', 'duanju'); "
-    "news, sports and holidays ('hurricane isaias', 'chicago marathon', 'columbus day').\n"
+    "news, sports and holidays ('hurricane isaias', 'chicago marathon', 'columbus day'); a real person, such as an "
+    "entrepreneur, influencer, celebrity, athlete or executive ('iman gadzhi', 'alex mashrabov', 'shane gillis'), unless "
+    "the examples show people remaking a clip of them as AI videos ('migos ai video', 'migos trend').\n"
     "When it is unclear whether the term is a trend, give 0.3 to 0.5.\n"
     "Answer with JSON only, one object per term, in the same order: [{\"i\": 0, \"score\": 0.9}, ...]"
 )
