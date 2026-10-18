@@ -12,7 +12,7 @@ SHOWN = 20
 OTHER_TERMS = 15
 POSTS_SHOWN = 3   # posts quoted in full per term
 # signal key -> label key, in the order of how early the signal comes
-KINDS = ["x", "hf", "tiktok", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
+KINDS = ["x", "hf", "tiktok", "pages", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
 
 
 def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
@@ -461,6 +461,10 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     if not tk.get("skipped"):
         ok = "" if tk.get("error") else t("st_tiktok_ok", read=tk["read"]) + (t("st_first") if tk.get("first_run") else "")
         lines.append(t("st_tiktok", state=_state(tk, ok)))
+    pg = b.get("pages", {"skipped": True})
+    if not pg.get("skipped"):
+        ok = "" if pg.get("error") else t("st_pages_ok", read=pg["read"], new=pg["new"]) + (t("st_first") if pg.get("first_run") else "")
+        lines.append(t("st_pages", state=_state(pg, ok)) + ("; " + "; ".join(pg["errors"][:2]) if pg.get("errors") and not pg.get("error") else ""))
     rs = b.get("rising", {"skipped": True})
     if not rs.get("skipped"):
         ok = "" if rs.get("error") else t("st_rising_ok", read=rs["read"], seeds=rs["seeds"], queries=rs["queries"],
@@ -471,6 +475,23 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
             lines.append(t(label, state=extra[key]["error"]))
     lines.append(t("cost", cost=_cost(b["x"], b.get("tiktok", {}))))
     return "\n".join(lines) + "\n"
+
+
+def heartbeat(job: str, b: dict[str, dict]) -> tuple[str, str]:
+    """The Feishu card for a run with nothing to push: each signal's state and the run's link,
+    so a day without a card means the job did not run."""
+    lines = []
+    for k, v in b.items():
+        if v.get("skipped"):
+            continue
+        read = v.get("read", v.get("posts", v.get("models")))
+        ok = t("fs_ok") + (f" · {read}" if read not in (None, "") else "") + (t("st_first") if v.get("first_run") else "")
+        lines.append(f"- {t('kind_' + k)}: {_state(v, ok)}")
+    run = os.environ.get("GITHUB_RUN_ID")
+    if run:
+        url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{run}"
+        lines += ["", t("fs_link", url=url)]
+    return t("fs_quiet", job=job), "\n".join(lines)
 
 
 def _trend(row: dict | None, bench: str) -> str:

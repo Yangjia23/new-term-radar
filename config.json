@@ -13,7 +13,11 @@
     "window": "now 7-d", "min_rise": 1000, "reserve": 20
   },
   "tiktok": {"countries": ["US"], "pages": 2, "days": 7},
-  "feishu": {"kinds": ["domain", "rising", "tiktok"]},
+  "pages": {
+    "dreamina": {"index": "https://dreamina.capcut.com/sitemap/new/513641/article/sitemap_index.xml",
+                 "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]}
+  },
+  "feishu": {"kinds": ["domain", "rising", "tiktok", "pages"], "heartbeat": true},
 
   "blocklist": ["huangguo"],
 

@@ -8,6 +8,7 @@ Signals:
   ① hf        models new to Hugging Face's trending top 50
   ① rising    searches Google Trends lists as rising around your seed words (SerpApi)
   ① tiktok    hashtags new to TikTok's trending top 100 (AIsa)
+  ① pages     trend pages new to an AI tool site's sitemap (Dreamina), the slug as the name
   ② breakout  one new GitHub repo taking off on its own
   ③ sitemaps  pages other sites added since the last run
   ③ domains   words registered as domains by the dozen in the last days (newly registered domains, free)
@@ -42,10 +43,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
+from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "tiktok", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"x", "hf", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -58,14 +59,23 @@ def run(fn, skip: bool = False) -> dict:
         return {"error": f"{type(exc).__name__}: {' '.join(str(exc).split())[:160]}"}
 
 
-def _finish(args, text: str, subject: str, push: tuple[str, str] | None = None) -> None:
+def _finish(args, text: str, subject: str, push: tuple[str, str] | None = None, quiet: tuple[str, str] | None = None) -> None:
     if args.out:
         Path(args.out).write_text(text)
     print(text)
     if args.mail:
         print(notify.send(subject, text))
+    _push(args, push or quiet)
+
+
+def _push(args, push: tuple[str, str] | None) -> None:
     if args.feishu and push:
         print(notify.feishu(*push))
+
+
+def _quiet(cfg: dict, job: str, blocks: dict) -> tuple[str, str] | None:
+    """The heartbeat card, when config.json asks for one (feishu.heartbeat)."""
+    return report.heartbeat(job, blocks) if cfg["feishu"].get("heartbeat") else None
 
 
 def _live(args, cfg: dict, lead: list[dict]) -> dict:
@@ -78,6 +88,7 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
               "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
               "tiktok": run(lambda: tiktok.trending(cfg, state), "tiktok" in args.skip),
+              "pages": run(lambda: pages.new_pages(cfg, state), "pages" in args.skip),
               "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
     conn = store.connect(state)
@@ -86,9 +97,10 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
     if report.named(cfg, lead) or errors:
         extra["ct"] = _live(args, cfg, lead)
         _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}",
-                report.push(cfg, lead, blocks, extra))
+                report.push(cfg, lead, blocks, extra), _quiet(cfg, "sources", blocks))
     else:
         print(t("sources_quiet") + "; ".join(f"{k} {v.get('posts', v.get('models', t('dash')))}" for k, v in blocks.items()))
+        _push(args, _quiet(cfg, "sources", blocks))
     return 0
 
 
@@ -129,7 +141,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
         Path(args.out).with_suffix(".json").write_text(json.dumps(
             {"leads": lead, **blocks, "gsc": found, "review": rev, "summary": summ, "keywords": extra["usecases"]}, ensure_ascii=False, indent=1, default=str))
     extra["ct"] = _live(args, cfg, lead)
-    _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra))
+    _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra), _quiet(cfg, "daily", blocks))
     return 0
 
 
