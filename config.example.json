@@ -25,6 +25,8 @@
     "futurepedia":   {"index": "https://www.futurepedia.io/sitemap_tools.xml", "pause": 2}
   },
 
+  "searchwords": {"on": true},
+
   "pages": {
     "dreamina": {"index": "https://dreamina.capcut.com/sitemap/new/513641/article/sitemap_index.xml",
                  "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]}

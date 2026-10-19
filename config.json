@@ -17,7 +17,8 @@
     "dreamina": {"index": "https://dreamina.capcut.com/sitemap/new/513641/article/sitemap_index.xml",
                  "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]}
   },
-  "feishu": {"kinds": ["domain", "rising", "tiktok", "pages"], "heartbeat": true},
+  "searchwords": {"on": true},
+  "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"], "heartbeat": true},
 
   "blocklist": ["huangguo"],
 

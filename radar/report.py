@@ -12,7 +12,7 @@ SHOWN = 20
 OTHER_TERMS = 15
 POSTS_SHOWN = 3   # posts quoted in full per term
 # signal key -> label key, in the order of how early the signal comes
-KINDS = ["x", "hf", "tiktok", "pages", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
+KINDS = ["demand", "x", "hf", "searchwords", "tiktok", "pages", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
 
 
 def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
@@ -462,6 +462,15 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
         ok = "" if tk.get("error") else t("st_tiktok_ok", read=tk["read"]) + (t("st_first") if tk.get("first_run") else "")
         lines.append(t("st_tiktok", state=_state(tk, ok)))
         lines += _entered(tk)
+    sw = b.get("searchwords", {"skipped": True})
+    if not sw.get("skipped"):
+        ok = "" if sw.get("error") else t("st_searchwords_ok", read=sw["read"], new=sw["new"]) + (t("st_first") if sw.get("first_run") else "")
+        lines.append(t("st_searchwords", state=_state(sw, ok)))
+    wd = b.get("demand", {"skipped": True})
+    if not wd.get("skipped"):
+        ok = "" if wd.get("error") else t("st_watch_ok", watching=wd["watching"], read=wd["read"], found=len(wd["terms"]),
+                                            added=(extra.get("watch") or {}).get("added", 0))
+        lines.append(t("st_watch", state=_state(wd, ok)) + ("; " + "; ".join(wd["errors"][:2]) if wd.get("errors") and not wd.get("error") else ""))
     pg = b.get("pages", {"skipped": True})
     if not pg.get("skipped"):
         ok = "" if pg.get("error") else t("st_pages_ok", read=pg["read"], new=pg["new"]) + (t("st_first") if pg.get("first_run") else "")

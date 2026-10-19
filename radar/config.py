@@ -27,9 +27,11 @@ DEFAULTS = {
                 "max_terms": 25},
     "rising": {"seeds": [], "window": "now 7-d", "geo": "", "min_rise": 1000, "reserve": 20},   # needs SERPAPI_API_KEY
     "tiktok": {"countries": [], "pages": 2, "days": 7},     # trending hashtags, through AIsa
+    "searchwords": {"on": False},   # TikTok's trending searches, through AIsa; they feed the watch list
+    "watch": {"kinds": ["searchwords", "tiktok", "pages"], "days": 21, "max_lookups": 60, "pause": 1, "gl": "us"},
     "pages": {},                # trend pages new to an AI tool site's sitemap (Dreamina), see radar/pages.py
     "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run
-    "feishu": {"kinds": ["domain", "rising", "tiktok", "pages"],   # the signals whose new names are pushed to Feishu
+    "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"],   # the signals whose new names are pushed to Feishu
                "heartbeat": False},     # true: a short card on a run with nothing new, so silence means trouble
     "usecases": {"per_day": 5, "generic": True, "model": "claude-sonnet-4-6", "min_volume": 50, "trends_max": 10, "recheck_days": 3,
                  "location_code": 2840, "benchmark": "gpts", "min_daily": 300, "related": True, "related_geo": "US",

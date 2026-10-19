@@ -8,6 +8,8 @@ Signals:
   ① hf        models new to Hugging Face's trending top 50
   ① rising    searches Google Trends lists as rising around your seed words (SerpApi)
   ① tiktok    hashtags new to TikTok's trending top 100 (AIsa)
+  ① searchwords  TikTok's trending searches, new since the last run (AIsa); they feed the watch list
+  ✅ demand    a watched name Google now completes with "ai": people look for the tool (free)
   ① pages     trend pages new to an AI tool site's sitemap (Dreamina), the slug as the name
   ② breakout  one new GitHub repo taking off on its own
   ③ sitemaps  pages other sites added since the last run
@@ -44,10 +46,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, sitemaps, sources, store, tiktok, usecases
+from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, tiktok, usecases, watch
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -88,15 +90,19 @@ def _live(args, cfg: dict, lead: list[dict]) -> dict:
 def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
               "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
+              "searchwords": run(lambda: searchwords.trending(cfg, state), "searchwords" in args.skip),
               "tiktok": run(lambda: tiktok.trending(cfg, state), "tiktok" in args.skip),
               "pages": run(lambda: pages.new_pages(cfg, state), "pages" in args.skip),
-              "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip)}
+              "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip),
+              # The names watched since an earlier run that Google now completes with "ai".
+              "demand": run(lambda: watch.check(cfg, state), "watch" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
     score = {r["term"].replace(" ", ""): r.get("named") for r in lead}
     for e in blocks["tiktok"].get("entered", []):
         e["score"] = score.get(e["term"])
     conn = store.connect(state)
-    extra = {"judge": judged, "record": run(lambda: {"recorded": store.record(conn, report.to_record(cfg, lead))})}
+    extra = {"judge": judged, "record": run(lambda: {"recorded": store.record(conn, report.to_record(cfg, lead))}),
+             "watch": run(lambda: {"added": watch.add(cfg, state, lead)}, "watch" in args.skip)}
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
     if report.named(cfg, lead) or errors:
         extra["ct"] = _live(args, cfg, lead)

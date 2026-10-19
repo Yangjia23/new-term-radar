@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from radar import aisa, config, ct, domains, goanyapi, i18n, rising
+from radar import aisa, config, ct, domains, goanyapi, i18n, rising, watch
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +25,7 @@ def english(monkeypatch):
     def no_search(*a, **k):
         raise rising.SerpError("no network in tests")
     monkeypatch.setattr(rising, "_get", no_search)
+    monkeypatch.setattr(watch, "_get", no_download)          # Google's autocomplete
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
 
     def no_lookup(*a, **k):
