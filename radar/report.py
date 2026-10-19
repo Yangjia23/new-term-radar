@@ -461,6 +461,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     if not tk.get("skipped"):
         ok = "" if tk.get("error") else t("st_tiktok_ok", read=tk["read"]) + (t("st_first") if tk.get("first_run") else "")
         lines.append(t("st_tiktok", state=_state(tk, ok)))
+        lines += _entered(tk)
     pg = b.get("pages", {"skipped": True})
     if not pg.get("skipped"):
         ok = "" if pg.get("error") else t("st_pages_ok", read=pg["read"], new=pg["new"]) + (t("st_first") if pg.get("first_run") else "")
@@ -477,6 +478,23 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     return "\n".join(lines) + "\n"
 
 
+def _entered(tk: dict) -> list[str]:
+    """The hashtags new to the chart this run, with the judge's score: what the filter saw, kept or not."""
+    tags = [t("tk_tag", tag=e["tag"], rank=e["rank"], score=f"{e['score']:.1f}" if e.get("score") is not None else t("dash"))
+            for e in tk.get("entered", [])]
+    return [t("tk_entered", tags=", ".join(tags))] if tags else []
+
+
+def tiktok_chart(c: dict) -> str:
+    lines = [t("tk_chart_title", n=len(c["tags"])), "", t("tk_chart_cols"), "|---|---|---|---|---|---|---|"]
+    for h in c["tags"]:
+        sc = h.get("score")
+        kept = "✅" if sc is None or sc >= c["min_score"] else ""
+        lines.append(f"| {h['rank']} | #{h['tag']} | {h['posts']:,} | {h['term']} | {sc if sc is not None else t('dash')} | {kept} | {h['seen'] or t('dash')} |")
+    lines += ["", f"- judge: {c['judge']}", t("cost", cost=_cost(c))]
+    return "\n".join(lines) + "\n"
+
+
 def heartbeat(job: str, b: dict[str, dict]) -> tuple[str, str]:
     """The Feishu card for a run with nothing to push: each signal's state and the run's link,
     so a day without a card means the job did not run."""
@@ -487,6 +505,8 @@ def heartbeat(job: str, b: dict[str, dict]) -> tuple[str, str]:
         read = v.get("read", v.get("posts", v.get("models")))
         ok = t("fs_ok") + (f" · {read}" if read not in (None, "") else "") + (t("st_first") if v.get("first_run") else "")
         lines.append(f"- {t('kind_' + k)}: {_state(v, ok)}")
+        if k == "tiktok":
+            lines += _entered(v)
     run = os.environ.get("GITHUB_RUN_ID")
     if run:
         url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{run}"

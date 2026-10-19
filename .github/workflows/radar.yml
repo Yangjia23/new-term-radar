@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "daily or sources"
+        description: "daily, sources, or tiktok-chart (the whole TikTok chart, every hashtag judged)"
         default: "daily"
 
 concurrency:
@@ -79,6 +79,8 @@ jobs:
         run: |
           if [ "$COMMAND" = "daily" ]; then
             python -m radar daily --skip x,hf,tiktok,rising --out report.md ${RADAR_EMAIL_TO:+--mail} ${FEISHU_APP_ID:+--feishu}
+          elif [ "$COMMAND" = "tiktok-chart" ]; then
+            python -m radar tiktok-chart --out report.md
           else
             python -m radar sources --out report.md ${RADAR_EMAIL_TO:+--mail} ${FEISHU_APP_ID:+--feishu}
           fi

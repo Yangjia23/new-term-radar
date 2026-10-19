@@ -59,6 +59,7 @@ def trending(cfg: dict, state: Path, today: date | None = None) -> dict:
     first_run = stored is None
     seen: dict[str, str] = stored or {}
     rows: dict[str, dict] = {}
+    entered: list[dict] = []     # every tag new to the chart, the ones too short to name anything too
     cost, read, errors = 0, 0, []
     for country in c["countries"]:
         try:
@@ -73,7 +74,10 @@ def trending(cfg: dict, state: Path, today: date | None = None) -> dict:
             new = key not in seen
             seen[key] = today.isoformat()
             term = core(h["tag"])
-            if first_run or not new or len(term) < 4:
+            if first_run or not new:
+                continue
+            entered.append({"tag": h["tag"], "rank": h["rank"], "posts": h["posts"], "country": country, "term": term})
+            if len(term) < 4:
                 continue
             row = rows.setdefault(term, {"term": term, "examples": [], "variants": [term, f"{term} ai"], "recent": 0,
                                          "note": t("note_tiktok", tag=h["tag"], rank=h["rank"], country=country, posts=f"{h['posts']:,}")})
@@ -82,9 +86,30 @@ def trending(cfg: dict, state: Path, today: date | None = None) -> dict:
     if read:
         cutoff = (today - timedelta(days=SEEN_DAYS)).isoformat()
         snap.save(path, {k: d for k, d in seen.items() if d >= cutoff})
-    out = {"countries": len(c["countries"]), "read": read, "first_run": first_run, "cost_micros": cost, "terms": list(rows.values())}
+    out = {"countries": len(c["countries"]), "read": read, "first_run": first_run, "cost_micros": cost, "terms": list(rows.values()),
+           "entered": entered}
     if errors:
         out["errors"] = errors
         if not read:
             out["error"] = "; ".join(errors[:2])
     return out
+
+
+def chart(cfg: dict, state: Path) -> dict:
+    """The whole chart as it stands, each tag with its core, whether the radar has seen it, and the
+    judge's score for every core: to check what the filter keeps and drops. Leaves the snapshot alone."""
+    from . import judge   # the judge imports the network client; keep it out of the signal's import
+    c = cfg["tiktok"]
+    seen = snap.load(state / "tiktok.json.gz") or {}
+    tags, cost = [], 0
+    for country in c["countries"]:
+        got, spent = hashtags(country, c["pages"], c["days"])
+        cost += spent
+        tags += [{**h, "country": country, "term": core(h["tag"]), "seen": seen.get(f"{country}:{h['tag']}")} for h in got]
+    rows = [{"term": term, "examples": [f"#{h['tag']}" for h in tags if h["term"] == term][:3]}
+            for term in dict.fromkeys(h["term"] for h in tags)]
+    judged = judge.score(rows, cfg["judge"]["model"], cfg["judge"].get("focus", "names"))
+    scores = {r["term"]: r.get("named") for r in rows}
+    for h in tags:
+        h["score"] = scores.get(h["term"])
+    return {"tags": tags, "judge": judged, "min_score": cfg["judge"]["min_score"], "cost_micros": cost}

@@ -21,6 +21,7 @@ Signals:
 
   python -m radar keywords "name one" "name two" [--repo "name one=owner/repo"] [--json]
   python -m radar leads    [--days 7] [--json]
+  python -m radar tiktok-chart [--out chart.md]   the whole TikTok chart, every hashtag judged (about $0.002)
   python -m radar pains    "keyword" [--extension ID] [--json]   what people complain about for a kind of tool
   python -m radar mcp      the MCP server on stdio (needs the `mcp` package)
 
@@ -91,6 +92,9 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
               "pages": run(lambda: pages.new_pages(cfg, state), "pages" in args.skip),
               "rising": run(lambda: rising.rising(cfg, state), "rising" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
+    score = {r["term"].replace(" ", ""): r.get("named") for r in lead}
+    for e in blocks["tiktok"].get("entered", []):
+        e["score"] = score.get(e["term"])
     conn = store.connect(state)
     extra = {"judge": judged, "record": run(lambda: {"recorded": store.record(conn, report.to_record(cfg, lead))})}
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
@@ -101,6 +105,17 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
     else:
         print(t("sources_quiet") + "; ".join(f"{k} {v.get('posts', v.get('models', t('dash')))}" for k, v in blocks.items()))
         _push(args, _quiet(cfg, "sources", blocks))
+    return 0
+
+
+def cmd_tiktok_chart(args, cfg: dict, state: Path) -> int:
+    """The whole TikTok chart, every tag judged: to check the filter. Writes --out and a .json beside it."""
+    c = tiktok.chart(cfg, state)
+    text = report.tiktok_chart(c)
+    if args.out:
+        Path(args.out).write_text(text)
+        Path(args.out).with_suffix(".json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
+    print(text)
     return 0
 
 
@@ -209,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         return serve_mcp()
     prog = "python -m radar" if __package__ == "radar" else "new-term-radar"  # installed, the package has another name
     p = argparse.ArgumentParser(prog=prog, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["daily", "sources", "keywords", "leads", "pains"])
+    p.add_argument("command", choices=["daily", "sources", "keywords", "leads", "pains", "tiktok-chart"])
     p.add_argument("names", nargs="*", help="for `keywords`: the names to read")
     p.add_argument("--repo", action="append", default=[], metavar="NAME=OWNER/REPO", help="for `keywords`: a name's GitHub repository")
     p.add_argument("--days", type=int, default=7, help="for `leads`: how far back")
@@ -245,6 +260,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_keywords(args, cfg, state)
     if args.command == "pains":
         return cmd_pains(args, cfg)
+    if args.command == "tiktok-chart":
+        return cmd_tiktok_chart(args, cfg, state)
     return cmd_sources(args, cfg, state) if args.command == "sources" else cmd_daily(args, cfg, state)
 
 

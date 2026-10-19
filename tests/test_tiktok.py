@@ -2,7 +2,7 @@
 import copy
 from datetime import date
 
-from radar import config, report, tiktok
+from radar import config, judge, report, tiktok
 
 TODAY = date(2026, 10, 16)
 
@@ -68,3 +68,29 @@ def test_a_blocklisted_term_is_never_pushed(cfg, monkeypatch):
     lead, _ = report.leads(cfg, {"domain": block})
     title, text = report.push(cfg, lead, {"domain": block}, {})
     assert title == "New-term radar · 1 new" and "bulin 47" in text and "huangguo" not in text
+
+
+def test_every_tag_new_to_the_chart_is_listed_with_its_score_even_when_too_short(tmp_path, monkeypatch):
+    _answer(monkeypatch, [("bulin47", 13815)])
+    tiktok.trending(_cfg(), tmp_path, TODAY)
+    _answer(monkeypatch, [("bulin47", 14000), ("nfl", 900), ("burningbridgesai", 3193)])
+    block = tiktok.trending(_cfg(), tmp_path, TODAY)
+    assert [(e["tag"], e["rank"], e["term"]) for e in block["entered"]] == [("nfl", 2, "nfl"), ("burningbridgesai", 3, "burningbridges")]
+    block["entered"][1]["score"] = 0.9
+    assert report._entered(block) == ["  new in the chart: #nfl (#2, —), #burningbridgesai (#3, 0.9)"]
+
+
+def test_the_chart_judges_every_tag_and_marks_the_ones_seen(tmp_path, monkeypatch):
+    _answer(monkeypatch, [("bulin47", 13815)])
+    tiktok.trending(_cfg(), tmp_path, TODAY)
+    _answer(monkeypatch, [("bulin47", 14000), ("nfl", 900)])
+
+    def score(rows, model, focus="names"):
+        for r in rows:
+            r["named"] = 0.8 if r["term"] == "bulin47" else 0.1
+        return {"judged": len(rows)}
+    monkeypatch.setattr(judge, "score", score)
+    c = tiktok.chart(_cfg(), tmp_path)
+    assert [(h["tag"], h["score"], h["seen"]) for h in c["tags"]] == [("bulin47", 0.8, "2026-10-16"), ("nfl", 0.1, None)]
+    text = report.tiktok_chart(c)
+    assert "| 1 | #bulin47 | 14,000 | bulin47 | 0.8 | ✅ | 2026-10-16 |" in text and "| 2 | #nfl | 900 | nfl | 0.1 |  | — |" in text
