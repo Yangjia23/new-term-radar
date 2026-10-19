@@ -464,7 +464,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
         lines += _entered(tk)
     sw = b.get("searchwords", {"skipped": True})
     if not sw.get("skipped"):
-        ok = "" if sw.get("error") else t("st_searchwords_ok", read=sw["read"], new=sw["new"]) + (t("st_first") if sw.get("first_run") else "")
+        ok = "" if sw.get("error") else t("st_searchwords_ok", read=sw["read"], new=sw["new"])
         lines.append(t("st_searchwords", state=_state(sw, ok)))
     wd = b.get("demand", {"skipped": True})
     if not wd.get("skipped"):

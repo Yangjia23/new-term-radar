@@ -40,6 +40,10 @@ def test_the_name_is_the_search_without_its_tail_words():
     assert searchwords.name("fish sweater TikTok goes viral") == "fish sweater"
     assert searchwords.name("Bulin 47’s Freestyle Surpasses 50M Views") == "bulin 47 freestyle surpasses 50m views"
     assert searchwords.name("trend") == ""
+    assert searchwords.name("Ba Ba Ba TikTok Dance Challenge") == "ba ba ba dance"
+    assert searchwords.name("suspect trend couple pumpkin patch original") == "suspect"
+    assert searchwords.name("ghostface trend with gf") == "ghostface"
+    assert searchwords.name("can't stop thinking of you letter r trend") == "cant stop thinking of you letter r"
 
 
 def test_the_first_run_reports_every_search_and_later_runs_only_the_new_ones(tmp_path, monkeypatch):

@@ -28,11 +28,18 @@ TAILS = ("goes viral", "go viral", "tiktok", "trend", "trends", "trending", "mem
          "original", "videos", "video", "clips")
 
 
+# A trend word inside the search ends the name: "ghostface trend with gf" -> "ghostface".
+_INSIDE = re.compile(r" (?:trend|trends|meme|memes|challenge|goes viral) ")
+
+
 def name(word: str) -> str:
-    """The name in a trending search: tail words off both ends, a possessive off the name."""
+    """The name in a trending search: "tiktok" out, what follows a trend word dropped, tail words
+    off both ends, a possessive off the name."""
     w = re.sub(r"[’']s\b", "", word.lower())
+    w = re.sub(r"[’']", "", w)
     w = re.sub(r"[^\w\s/-]", " ", w)
-    w = " ".join(w.split())
+    w = " ".join(x for x in w.split() if x != "tiktok")
+    w = _INSIDE.split(f" {w} ", 1)[0].strip() if _INSIDE.search(f" {w} ") else w
     cut = True
     while cut:
         cut = False
