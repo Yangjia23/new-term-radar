@@ -65,6 +65,13 @@ def add(cfg: dict, state: Path, lead: list[dict], today: date | None = None) -> 
     return joined
 
 
+def _term(w: dict, today: date) -> dict:
+    found = w["completions"]
+    days = (date.fromisoformat(w["found"]) - date.fromisoformat(w["added"])).days
+    return {"term": w["term"], "examples": found[:3], "variants": [w["term"], f"{w['term']} ai", *found[:3]],
+            "recent": len(found), "floor": w.get("score"), "note": t("note_demand", top=found[0], n=len(found), days=days)}
+
+
 def check(cfg: dict, state: Path, today: date | None = None) -> dict:
     """Looks up the names not yet looked up today; the ones people now search with "ai" are the terms."""
     c = cfg["watch"]
@@ -77,6 +84,10 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
     kept = {k: w for k, w in kept.items() if w["added"] >= cutoff or w["found"]}
     due = [w for w in kept.values() if not w["found"] and w["checked"] != today.isoformat()][:c["max_lookups"]]
     terms, errors = [], []
+    for w in kept.values():     # found before a name was marked as reported: report it once now
+        if w["found"] and not w.get("emitted"):
+            terms.append(_term(w, today))
+            w["emitted"] = True
     for i, w in enumerate(due):
         if i:
             time.sleep(c["pause"])
@@ -89,10 +100,8 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
             continue
         w["checked"] = today.isoformat()
         if found:
-            w["found"], w["completions"] = today.isoformat(), found[:5]
-            days = (today - date.fromisoformat(w["added"])).days
-            terms.append({"term": w["term"], "examples": found[:3], "variants": [w["term"], f"{w['term']} ai", *found[:3]],
-                          "recent": len(found), "note": t("note_demand", top=found[0], n=len(found), days=days)})
+            w["found"], w["completions"], w["emitted"] = today.isoformat(), found[:5], True
+            terms.append(_term(w, today))
     snap.save(path, kept)
     out = {"read": len(due), "watching": sum(1 for w in kept.values() if not w["found"]), "terms": terms}
     if errors:

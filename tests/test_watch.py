@@ -99,8 +99,13 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     cfg_path.write_text(json.dumps({"lang": "en", "searchwords": {"on": True}, "watch": {"pause": 0},
                                     "skip": ["x", "hf", "tiktok", "rising", "pages"], "judge": {"model": "m", "min_score": 0.5}}))
     _words(monkeypatch, ["foam mirror tiktok trend", "Six Flags Closes Goliath"])
-    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": [
-        r.__setitem__("named", 0.8 if "mirror" in r["term"] else 0.1) for r in rows] and {"judged": len(rows)})
+    scores = {"mirror": 0.8}
+
+    def score(rows, model, focus="names"):
+        for r in rows:
+            r["named"] = scores["mirror"] if "mirror" in r["term"] else 0.1
+        return {"judged": len(rows)}
+    monkeypatch.setattr(report.judge, "score", score)
     pushed = []
     monkeypatch.setattr(notify, "feishu", lambda title, text: pushed.append((title, text)) or "feishu sent")
     _google(monkeypatch, {})
@@ -111,7 +116,21 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     _words(monkeypatch, ["foam mirror tiktok trend", "Six Flags Closes Goliath"])
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai video"]})
     _day(monkeypatch, date(2026, 10, 20))
+    scores["mirror"] = 0.2         # judged again with Google's completions, it keeps the score it joined with
     cli.main(args)
     title, text = pushed[0]
     assert title == "New-term radar · 1 new" and text.startswith("1. **foam mirror**")
     assert 'Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
+
+
+def test_a_name_found_before_it_was_marked_reported_is_reported_once(tmp_path, monkeypatch):
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("foam mirror", ["searchwords"], 0.7)], TODAY)
+    path = tmp_path / "watch.json.gz"
+    kept = watch.snap.load(path)
+    kept["foammirror"].update(found="2026-10-19", completions=["foam mirror ai video"])      # as an older run left it
+    watch.snap.save(path, kept)
+    _google(monkeypatch, {})
+    again = watch.check(cfg, tmp_path, date(2026, 10, 20))
+    assert [r["term"] for r in again["terms"]] == ["foam mirror"] and again["terms"][0]["floor"] == 0.7
+    assert watch.check(cfg, tmp_path, date(2026, 10, 21))["terms"] == []

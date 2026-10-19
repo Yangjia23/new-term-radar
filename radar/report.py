@@ -35,11 +35,16 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
                 row["repo"] = r["repo"]
             if r.get("about"):
                 row["about"] = r["about"]
+            if r.get("floor") is not None:      # judged once already: a watched name Google now completes
+                row["floor"] = max(row.get("floor", 0), r["floor"])
     rows = list(out.values())
     for r in rows:
         r["known"] = config.known(cfg, r["term"])
         opportunity.tag(r)
     status = judge.score(rows, cfg["judge"]["model"], cfg["judge"].get("focus", "names")) if rows else {"judged": 0}
+    for r in rows:
+        if "floor" in r and "named" in r:
+            r["named"] = max(r["named"], r["floor"])
     cut = cfg["judge"]["min_score"]
     # Earliest signal first among equals: a name the labs said today beats a sitemap echo.
     rows.sort(key=lambda r: (-(r.get("named", 0) >= cut), -len(r["kinds"]),
