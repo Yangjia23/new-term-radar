@@ -11,6 +11,12 @@ list. Once a day each is looked up in Google's autocomplete (free, one request a
 `pause` seconds apart); the first time a completion holds the name and "ai", it becomes a
 "demand" lead with those completions, and is not looked up again. A name leaves the list
 after `days`.
+
+Completions say people search a name, not since when: "reporter voice ai" has been searched
+for years. So a name found in them is read in Google Trends (one task, about $0.0012): one
+that rose in the last three weeks out of almost nothing is pushed with the day it started;
+one searched before is set aside as old and not pushed. Too few searches for Trends to draw
+a curve, it is pushed and says so.
 """
 from __future__ import annotations
 
@@ -22,14 +28,19 @@ import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import UA, snap
+from . import UA, aisa, review, snap
 from .i18n import t
+from .usecases import shape
 
 SUGGEST = "https://suggestqueries.google.com/complete/search"
 # A completion with one of these asks for a template: "hotel lobby ai video", "burning bridges ai video generator free".
 # Without, "bulin 47 ai" alone, the need is there but its shape is not: a weak lead, for a person to read.
 TEMPLATE = re.compile(r"\b(video|videos|trend|filter|meme|generator|template|effect|edit|prompt|prompts|app)\b")
 TIMEOUT = 15
+# Trends for a name Google completes with "ai": 90 days worldwide, a rise judged in the last 21
+# against the 69 before. Under usecases.NEW_BASE_MAX before, the name is new.
+FRESH_DAYS = 90
+FRESH = {"unsettled": review.UNSETTLED_DAYS, "window": 21, "factor": review.RISE_FACTOR, "days": 2}
 _AI = re.compile(r"\bai\b")
 
 
@@ -72,18 +83,36 @@ def strong(completions: list[str]) -> bool:
     return any(TEMPLATE.search(c.lower()) for c in completions)
 
 
-def _term(w: dict, today: date) -> dict:
+def _term(w: dict) -> dict:
     found = w["completions"]
     days = (date.fromisoformat(w["found"]) - date.fromisoformat(w["added"])).days
     sure = strong(found)
     top = next((c for c in found if TEMPLATE.search(c.lower())), found[0])
+    curve = w.get("curve") or {}
+    when = t("demand_tiny") if curve.get("no_data") else t("demand_new", day=curve["started"][5:], now=t("now_" + curve["now"]))
     return {"term": w["term"], "examples": found[:3], "variants": [w["term"], f"{w['term']} ai", *found[:3]],
             "recent": len(found), "floor": w.get("score"), "strong": sure,
-            "note": t("note_demand_strong" if sure else "note_demand_weak", top=top, n=len(found), days=days)}
+            "note": t("note_demand_strong" if sure else "note_demand_weak", top=top, n=len(found), days=days) + when}
+
+
+def fresh(terms: list[str], today: date) -> tuple[dict[str, dict], int]:
+    """Each name's worldwide Trends curve over FRESH_DAYS: {term: usecases.shape(...)}. A name that
+    rose in the last FRESH["window"] days out of almost nothing is new; one that was searched before
+    (a May meme, "reporter voice") is not. A failed lookup leaves the name out."""
+    window = {"date_from": (today - timedelta(days=FRESH_DAYS)).isoformat(), "date_to": today.isoformat()}
+    calls = [{"call_id": f"f{i}", "tool": review.TOOL, "arguments": {"body": [{"keywords": [k], **window}]}}
+             for i, k in enumerate(terms)]
+    data, cost = aisa.call_all(calls)
+    out = {}
+    for i, k in enumerate(terms):
+        if f"f{i}" in data:
+            out[k] = shape(review._series((data[f"f{i}"].get("tasks") or [{}])[0]), today, FRESH)
+    return out, cost
 
 
 def check(cfg: dict, state: Path, today: date | None = None) -> dict:
-    """Looks up the names not yet looked up today; the ones people now search with "ai" are the terms."""
+    """Looks up the names not yet looked up today. A name people now search with "ai" is read in
+    Trends: new, it is a term; searched for months already, it is set aside as old."""
     c = cfg["watch"]
     if not c["kinds"]:
         return {"skipped": True}
@@ -93,11 +122,7 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
     cutoff = (today - timedelta(days=c["days"])).isoformat()
     kept = {k: w for k, w in kept.items() if w["added"] >= cutoff or w["found"]}
     due = [w for w in kept.values() if not w["found"] and w["checked"] != today.isoformat()][:c["max_lookups"]]
-    terms, errors = [], []
-    for w in kept.values():     # found before a name was marked as reported: report it once now
-        if w["found"] and not w.get("emitted"):
-            terms.append(_term(w, today))
-            w["emitted"] = True
+    hits, errors = [], []
     for i, w in enumerate(due):
         if i:
             time.sleep(c["pause"])
@@ -110,10 +135,29 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
             continue
         w["checked"] = today.isoformat()
         if found:
-            w["found"], w["completions"], w["emitted"] = today.isoformat(), found[:5], True
-            terms.append(_term(w, today))
+            hits.append((w, found[:5]))
+    cost, terms, old = 0, [], []
+    if hits:
+        try:
+            curves, cost = fresh([w["term"] for w, _ in hits], today)
+        except aisa.AisaError as exc:     # no curve, no verdict: looked up again tomorrow
+            curves = {}
+            errors.append(f"Trends: {str(exc)[:100]}")
+        for w, found in hits:
+            curve = curves.get(w["term"])
+            if curve is None:
+                w["checked"] = None
+                continue
+            w["found"], w["completions"], w["curve"] = today.isoformat(), found, curve
+            if curve.get("no_data") or curve.get("new"):
+                w["emitted"] = True
+                terms.append(_term(w))
+            else:
+                w["old"] = True
+                old.append(w["term"])
     snap.save(path, kept)
-    out = {"read": len(due), "watching": sum(1 for w in kept.values() if not w["found"]), "terms": terms}
+    out = {"read": len(due), "watching": sum(1 for w in kept.values() if not w["found"]), "terms": terms,
+           "old": old, "cost_micros": cost}
     if errors:
         out["errors"] = errors
         if len(errors) >= len(due):

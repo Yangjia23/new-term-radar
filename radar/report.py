@@ -477,6 +477,8 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     if not wd.get("skipped"):
         ok = "" if wd.get("error") else t("st_watch_ok", watching=wd["watching"], read=wd["read"], found=len(wd["terms"]),
                                             added=(extra.get("watch") or {}).get("added", 0))
+        if wd.get("old"):
+            ok += t("st_watch_old", n=len(wd["old"]), terms=", ".join(wd["old"][:8]))
         lines.append(t("st_watch", state=_state(wd, ok)) + ("; " + "; ".join(wd["errors"][:2]) if wd.get("errors") and not wd.get("error") else ""))
     pg = b.get("pages", {"skipped": True})
     if not pg.get("skipped"):
@@ -490,7 +492,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("judge", "st_judge"), ("record", "st_record")):
         if extra.get(key, {}).get("error"):
             lines.append(t(label, state=extra[key]["error"]))
-    lines.append(t("cost", cost=_cost(b.get("x", {}), b.get("tiktok", {}), b.get("searchwords", {}))))
+    lines.append(t("cost", cost=_cost(b.get("x", {}), b.get("tiktok", {}), b.get("searchwords", {}), b.get("demand", {}))))
     return "\n".join(lines) + "\n"
 
 

@@ -1,7 +1,9 @@
 """Signal ① searchwords (TikTok's trending searches) and the watch list (Google's autocomplete). No network."""
 import copy
 import json
-from datetime import date
+from datetime import date, timedelta
+
+import pytest
 
 from radar import __main__ as cli
 from radar import config, notify, report, searchwords, watch
@@ -9,6 +11,19 @@ from radar import config, notify, report, searchwords, watch
 TODAY = date(2026, 10, 19)
 WORDS = ["foam mirror tiktok trend", "Bulin 47’s Freestyle Surpasses 50M Views", "Hell Nah Cuh TikTok Meme",
          "Testimony Opens in Matthew Farwell Trial", "trend"]
+
+
+REAL_FRESH = watch.fresh      # kept before the fixture below stands in for it
+NEW = {"no_data": False, "new": True, "rose": True, "started": "2026-10-12", "now": "rising"}
+OLD = {"no_data": False, "new": False, "rose": False, "now": "flat"}
+
+
+@pytest.fixture(autouse=True)
+def curves(monkeypatch):
+    """Every name Google completes reads as new in Trends, unless a test says otherwise."""
+    by_term = {}
+    monkeypatch.setattr(watch, "fresh", lambda terms, today: ({k: by_term.get(k, NEW) for k in terms}, 1200))
+    return by_term
 
 
 def _cfg():
@@ -83,7 +98,7 @@ def test_judged_names_of_the_watched_kinds_join_and_are_looked_up_once_a_day(tmp
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai video", "foam mirror ai trend", "foam mirror art"]})
     found = watch.check(cfg, tmp_path, date(2026, 10, 21))
     assert [r["term"] for r in found["terms"]] == ["foam mirror"] and found["watching"] == 0
-    assert found["terms"][0]["note"] == 'Strong: Google completes "foam mirror ai video" (2 with ai, 2 days after it was first seen)'
+    assert found["terms"][0]["note"] == 'Strong: Google completes "foam mirror ai video" (2 with ai, 2 days after it was first seen) · rising since 10-12, still rising'
     assert watch.check(cfg, tmp_path, date(2026, 10, 22))["read"] == 0                # found once, never again
 
 
@@ -123,17 +138,52 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     assert 'Strong: Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
 
 
-def test_a_name_found_before_it_was_marked_reported_is_reported_once(tmp_path, monkeypatch):
+def test_a_name_searched_for_months_is_set_aside_as_old_and_never_pushed(tmp_path, monkeypatch, curves):
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("reporter voice", ["searchwords"], 0.6), _lead("foam mirror", ["searchwords"], 0.7)], TODAY)
+    _google(monkeypatch, {"reporter voice ai": ["reporter voice ai", "news reporter voice ai"], "foam mirror ai": ["foam mirror ai video"]})
+    curves["reporter voice"] = OLD
+    got = watch.check(cfg, tmp_path, TODAY)
+    assert [r["term"] for r in got["terms"]] == ["foam mirror"] and got["old"] == ["reporter voice"] and got["cost_micros"] == 1200
+    assert watch.check(cfg, tmp_path, date(2026, 10, 20))["read"] == 0               # old: not looked up again
+
+
+def test_too_few_searches_for_a_curve_is_pushed_and_says_so(tmp_path, monkeypatch, curves):
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("bulin 47", ["searchwords"], 0.8)], TODAY)
+    _google(monkeypatch, {"bulin 47 ai": ["bulin 47 ai"]})
+    curves["bulin 47"] = {"no_data": True}
+    note = watch.check(cfg, tmp_path, TODAY)["terms"][0]["note"]
+    assert note.endswith(" · too few searches for a Trends curve yet")
+
+
+def test_a_failed_trends_lookup_tries_again_tomorrow(tmp_path, monkeypatch):
     cfg = _cfg()
     watch.add(cfg, tmp_path, [_lead("foam mirror", ["searchwords"], 0.7)], TODAY)
-    path = tmp_path / "watch.json.gz"
-    kept = watch.snap.load(path)
-    kept["foammirror"].update(found="2026-10-19", completions=["foam mirror ai video"])      # as an older run left it
-    watch.snap.save(path, kept)
-    _google(monkeypatch, {})
-    again = watch.check(cfg, tmp_path, date(2026, 10, 20))
-    assert [r["term"] for r in again["terms"]] == ["foam mirror"] and again["terms"][0]["floor"] == 0.7
-    assert watch.check(cfg, tmp_path, date(2026, 10, 21))["terms"] == []
+    _google(monkeypatch, {"foam mirror ai": ["foam mirror ai video"]})
+
+    def down(terms, today):
+        raise watch.aisa.AisaError("HTTP 502")
+    monkeypatch.setattr(watch, "fresh", down)
+    got = watch.check(cfg, tmp_path, TODAY)
+    assert got["terms"] == [] and got["errors"] == ["Trends: HTTP 502"] and got["watching"] == 1
+    monkeypatch.setattr(watch, "fresh", lambda terms, today: ({k: NEW for k in terms}, 0))
+    assert [r["term"] for r in watch.check(cfg, tmp_path, date(2026, 10, 20))["terms"]] == ["foam mirror"]
+
+
+def _trends(values, end):
+    days = [end - timedelta(days=len(values) - 1 - i) for i in range(len(values))]
+    return {"tasks": [{"result": [{"items": [{"data": [{"date_from": d.isoformat(), "values": [v]} for d, v in zip(days, values)]}]}]}]}
+
+
+def test_fresh_tells_a_new_rise_from_a_meme_of_may(monkeypatch):
+    end = TODAY
+    new = [0] * 75 + [0, 2, 5, 12, 30, 55, 80, 100, 95, 90, 88, 85, 80, 70, 0]     # rising since about 10-08
+    may = [100, 90, 70, 60, 50, 45, 40, 38, 35, 30] + [25] * 65 + [22] * 15          # searched long before, fading
+    monkeypatch.setattr(watch.aisa, "call_all", lambda calls: ({"f0": _trends(new, end), "f1": _trends(may, end)}, 2400))
+    got, cost = REAL_FRESH(["evan walk dance", "hotel lobby"], TODAY)
+    assert got["evan walk dance"]["new"] and got["evan walk dance"]["started"] >= "2026-10-01"
+    assert not got["hotel lobby"].get("new") and cost == 2400
 
 
 def test_a_completion_naming_a_template_is_strong_the_name_alone_is_weak(tmp_path, monkeypatch):
@@ -163,4 +213,4 @@ def test_the_hourly_job_pushes_demand_and_nothing_else(tmp_path, monkeypatch):
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai filter"]})
     _day(monkeypatch, date(2026, 10, 20))
     cli.main(args)
-    assert len(pushed) == 1 and "**foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1]
+    assert len(pushed) == 1 and "**foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1] and "rising since 10-12" in pushed[0][1]
