@@ -180,10 +180,17 @@ def test_fresh_tells_a_new_rise_from_a_meme_of_may(monkeypatch):
     end = TODAY
     new = [0] * 75 + [0, 2, 5, 12, 30, 55, 80, 100, 95, 90, 88, 85, 80, 70, 0]     # rising since about 10-08
     may = [100, 90, 70, 60, 50, 45, 40, 38, 35, 30] + [25] * 65 + [22] * 15          # searched long before, fading
-    monkeypatch.setattr(watch.aisa, "call_all", lambda calls: ({"f0": _trends(new, end), "f1": _trends(may, end)}, 2400))
-    got, cost = REAL_FRESH(["evan walk dance", "hotel lobby"], TODAY)
-    assert got["evan walk dance"]["new"] and got["evan walk dance"]["started"] >= "2026-10-01"
-    assert not got["hotel lobby"].get("new") and cost == 2400
+    song = [30, 28, 32, 29, 31] * 18                                                   # "burning bridges": a song, searched all year
+    answers = {"evan walk dance ai": new, "evan walk dance": may, "hotel lobby ai": may, "hotel lobby": may,
+               "burning bridges ai": new, "burning bridges": song, "letter k ai": [0] * 90, "letter k": song}
+    monkeypatch.setattr(watch.aisa, "call_all", lambda calls: (
+        {c["call_id"]: _trends(answers[c["arguments"]["body"][0]["keywords"][0]], end) for c in calls}, 1200 * len(calls)))
+    got, cost = REAL_FRESH(["evan walk dance", "hotel lobby", "burning bridges", "letter k"], TODAY)
+    assert got["evan walk dance"]["new"] and got["evan walk dance"]["asked"] == "evan walk dance ai"
+    assert got["burning bridges"]["new"]                                              # the phrase is old, "... ai" is new
+    assert not got["hotel lobby"].get("new")
+    assert got["letter k"]["asked"] == "letter k" and not got["letter k"].get("new")  # "... ai" too small: the name decides
+    assert cost == 9600
 
 
 def test_a_completion_naming_a_template_is_strong_the_name_alone_is_weak(tmp_path, monkeypatch):

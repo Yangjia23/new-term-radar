@@ -13,10 +13,11 @@ list. Once a day each is looked up in Google's autocomplete (free, one request a
 after `days`.
 
 Completions say people search a name, not since when: "reporter voice ai" has been searched
-for years. So a name found in them is read in Google Trends (one task, about $0.0012): one
-that rose in the last three weeks out of almost nothing is pushed with the day it started;
-one searched before is set aside as old and not pushed. Too few searches for Trends to draw
-a curve, it is pushed and says so.
+for years. So a name found in them is read in Google Trends, "<name> ai" and the name alone (two tasks,
+about $0.0024): when "<name> ai" rose in the last three weeks out of almost nothing, the name
+is pushed with the day it started; searched before, it is set aside as old and not pushed.
+"<name> ai" too small for a curve, the name alone decides; both too small, it is pushed and
+says so.
 """
 from __future__ import annotations
 
@@ -96,17 +97,25 @@ def _term(w: dict) -> dict:
 
 
 def fresh(terms: list[str], today: date) -> tuple[dict[str, dict], int]:
-    """Each name's worldwide Trends curve over FRESH_DAYS: {term: usecases.shape(...)}. A name that
-    rose in the last FRESH["window"] days out of almost nothing is new; one that was searched before
-    (a May meme, "reporter voice") is not. A failed lookup leaves the name out."""
+    """Each name's worldwide Trends curves over FRESH_DAYS, "<name> ai" first: {term: shape} with
+    "asked" the phrase read. "<name> ai" is the need itself: "burning bridges" is a song and a
+    phrase searched all year (a base of 29 of 100), "burning bridges ai" was not. Too small for a
+    curve, the name alone is read. A failed lookup leaves the name out."""
     window = {"date_from": (today - timedelta(days=FRESH_DAYS)).isoformat(), "date_to": today.isoformat()}
-    calls = [{"call_id": f"f{i}", "tool": review.TOOL, "arguments": {"body": [{"keywords": [k], **window}]}}
-             for i, k in enumerate(terms)]
+    asks = [(term, phrase) for term in terms for phrase in (f"{term} ai", term)]
+    calls = [{"call_id": f"f{i}", "tool": review.TOOL, "arguments": {"body": [{"keywords": [phrase], **window}]}}
+             for i, (_, phrase) in enumerate(asks)]
     data, cost = aisa.call_all(calls)
-    out = {}
-    for i, k in enumerate(terms):
+    curves: dict[str, dict] = {}
+    for i, (term, phrase) in enumerate(asks):
         if f"f{i}" in data:
-            out[k] = shape(review._series((data[f"f{i}"].get("tasks") or [{}])[0]), today, FRESH)
+            curves[phrase] = {**shape(review._series((data[f"f{i}"].get("tasks") or [{}])[0]), today, FRESH), "asked": phrase}
+    out = {}
+    for term in terms:
+        ai, bare = curves.get(f"{term} ai"), curves.get(term)
+        pick = ai if ai and not ai.get("no_data") else bare if bare else ai
+        if pick is not None:
+            out[term] = pick
     return out, cost
 
 
