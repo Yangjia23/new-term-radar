@@ -293,11 +293,10 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
 
 
 def _vouch(cfg: dict, rows: list[dict], errors: list[str]) -> None:
-    """Scores the judge may not take from the word alone. "flying car" reads as an everyday word
-    (0.2 on 19 October 2026); two of its eight new domains carried "ai", and two of its sites were
-    already "Flying Car AI Video Generator". A wave with `intent_floor` domains with ai or video
-    is kept at the judge's cut, a weak lead for a person to read; one whose site is a tool for it
-    is a strong lead, its site first among the examples."""
+    """A score the judge cannot take from the word alone. "flying car" reads as an everyday word
+    (0.2 on 19 October 2026) while two of its sites were already "Flying Car AI Video Generator":
+    a wave whose site is a tool for it is a strong lead, that site first among its examples.
+    Domains with "ai" alone do not vouch: on 20 October that let through "biography" and "reels"."""
     c = cfg["domains"]
     try:
         found = sites.tools(rows, c["site_hosts"]) if rows and c.get("site_hosts") else {}
@@ -305,9 +304,6 @@ def _vouch(cfg: dict, rows: list[dict], errors: list[str]) -> None:
         found = {}
         errors.append(f"sites: {type(exc).__name__}: {str(exc)[:100]}")
     for r in rows:
-        if c.get("intent_floor") and r["intent"] >= c["intent_floor"]:
-            r["floor"] = cfg.get("judge", {}).get("min_score", 0.5)
-            r["note"] += t("note_domain_intent", n=r["intent"])
         if r["core"] in found:
             host, title = found[r["core"]]
             r["floor"], r["strong"] = SITE_FLOOR, True

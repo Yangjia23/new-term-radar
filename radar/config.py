@@ -24,7 +24,7 @@ DEFAULTS = {
     "new_sites": {"queries": {"ai": "%ai%"}, "weekday": 0, "window_days": 90, "min_etv": 1000, "min_keywords": 20},
     "review": {"after_days": 14, "per_day": 5},
     "domains": {"window_days": 3, "history_days": 30, "min_domains": 3, "min_domains_ai": 2, "min_lift": 3, "min_len": 5,
-                "max_terms": 25, "intent_floor": 2, "site_hosts": 4},
+                "max_terms": 25, "site_hosts": 4},
     "rising": {"seeds": [], "window": "now 7-d", "geo": "", "min_rise": 1000, "reserve": 20},   # needs SERPAPI_API_KEY
     "tiktok": {"countries": [], "pages": 2, "days": 7},     # trending hashtags, through AIsa
     "searchwords": {"on": False},   # TikTok's trending searches, through AIsa; they feed the watch list

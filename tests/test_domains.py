@@ -82,7 +82,7 @@ def test_diff_keeps_each_list_reports_once_and_survives_a_bad_day(tmp_path, monk
     first = domains.diff(cfg, tmp_path, TODAY)
     assert first["first_run"] and first["read"] == list(lists) and first["window"] == list(lists)
     assert {r["core"] for r in first["terms"]} >= {"hotellobby", "bulin47"} and first["terms"][0]["first_day"] == "2026-10-16"
-    assert first["terms"][0]["registered"] == "10-14" and "registered 10-14;" in first["terms"][0]["note"]
+    assert first["terms"][0]["registered"] == "10-14" and first["terms"][0]["note"].endswith("registered 10-14")
     again = domains.diff(cfg, tmp_path, TODAY)
     assert again["read"] == [] and again["terms"] == []                     # kept on disk, and reported already
     (tmp_path / "domains" / "registered.json.gz").unlink()
@@ -113,7 +113,7 @@ def test_a_site_is_a_tool_when_its_page_names_the_word_and_an_ai_tool():
     assert not sites.tool("hotellobby", "Flying Car AI Video Generator")          # a tool, for another word
 
 
-def test_waves_with_ai_domains_keep_the_cut_and_a_live_tool_makes_them_strong(monkeypatch):
+def test_a_live_tool_makes_a_wave_strong_and_ai_domains_alone_do_not(monkeypatch):
     monkeypatch.setattr(sites, "look", lambda host: sites.head(PAGES.get(host, "")))
     rows = [{"core": "flyingcar", "intent": 2, "note": "n", "examples": ["flyingcar.dev", "flyingcarai.art"]},
             {"core": "crazyfrog", "intent": 2, "note": "n", "examples": ["crazyfrogai.pro"]},
@@ -123,8 +123,7 @@ def test_waves_with_ai_domains_keep_the_cut_and_a_live_tool_makes_them_strong(mo
     car, frog, truck = rows
     assert car["floor"] == domains.SITE_FLOOR and car["strong"] and car["examples"][0] == "flyingcarai.art"
     assert "flyingcarai.art" in car["note"] and "Flying Car AI" in car["note"]
-    assert frog["floor"] == 0.4 and not frog.get("strong") and "2" in frog["note"]
-    assert "floor" not in truck and truck["note"] == "n" and errors == []
+    assert "floor" not in frog and frog["note"] == "n" and "floor" not in truck and errors == []
 
 
 def test_a_floor_lifts_the_judges_score_in_the_lead(cfg, monkeypatch):
