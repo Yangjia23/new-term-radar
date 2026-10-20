@@ -83,7 +83,7 @@ def test_judged_names_of_the_watched_kinds_join_and_are_looked_up_once_a_day(tmp
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai video", "foam mirror ai trend", "foam mirror art"]})
     found = watch.check(cfg, tmp_path, date(2026, 10, 21))
     assert [r["term"] for r in found["terms"]] == ["foam mirror"] and found["watching"] == 0
-    assert found["terms"][0]["note"] == 'Google completes "foam mirror ai video" (2 with ai, 2 days after it was first seen)'
+    assert found["terms"][0]["note"] == 'Strong: Google completes "foam mirror ai video" (2 with ai, 2 days after it was first seen)'
     assert watch.check(cfg, tmp_path, date(2026, 10, 22))["read"] == 0                # found once, never again
 
 
@@ -120,7 +120,7 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     cli.main(args)
     title, text = pushed[0]
     assert title == "New-term radar · 1 new" and text.startswith("1. **foam mirror**")
-    assert 'Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
+    assert 'Strong: Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
 
 
 def test_a_name_found_before_it_was_marked_reported_is_reported_once(tmp_path, monkeypatch):
@@ -134,3 +134,33 @@ def test_a_name_found_before_it_was_marked_reported_is_reported_once(tmp_path, m
     again = watch.check(cfg, tmp_path, date(2026, 10, 20))
     assert [r["term"] for r in again["terms"]] == ["foam mirror"] and again["terms"][0]["floor"] == 0.7
     assert watch.check(cfg, tmp_path, date(2026, 10, 21))["terms"] == []
+
+
+def test_a_completion_naming_a_template_is_strong_the_name_alone_is_weak(tmp_path, monkeypatch):
+    assert watch.strong(["hotel lobby ai video", "hotel lobby ai"]) and watch.strong(["burning bridges ai video generator free"])
+    assert not watch.strong(["bulin 47 ai"]) and not watch.strong(["reporter voice ai", "news reporter voice ai"])
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("bulin 47", ["searchwords"], 0.8)], TODAY)
+    _google(monkeypatch, {"bulin 47 ai": ["bulin 47 ai", "47 47 meaning"]})
+    weak = watch.check(cfg, tmp_path, TODAY)["terms"][0]
+    assert not weak["strong"] and weak["note"].startswith('Weak: Google completes only "bulin 47 ai"')
+
+
+def test_the_hourly_job_pushes_demand_and_nothing_else(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({"lang": "en", "searchwords": {"on": True}, "watch": {"pause": 0},
+                                    "feishu": {"heartbeat": True}, "judge": {"model": "m", "min_score": 0.5}}))
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": [
+        r.__setitem__("named", 0.8) for r in rows] and {"judged": len(rows)})
+    pushed = []
+    monkeypatch.setattr(notify, "feishu", lambda title, text: pushed.append((title, text)) or "feishu sent")
+    args = ["searchwords", "--config", str(cfg_path), "--state", str(tmp_path / "state"), "--feishu"]
+    _words(monkeypatch, ["foam mirror tiktok trend"])
+    _google(monkeypatch, {})
+    _day(monkeypatch, TODAY)
+    cli.main(args)
+    assert pushed == []                                              # a new name, watched: no push, no heartbeat
+    _google(monkeypatch, {"foam mirror ai": ["foam mirror ai filter"]})
+    _day(monkeypatch, date(2026, 10, 20))
+    cli.main(args)
+    assert len(pushed) == 1 and "**foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1]

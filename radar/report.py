@@ -35,6 +35,8 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
                 row["repo"] = r["repo"]
             if r.get("about"):
                 row["about"] = r["about"]
+            if r.get("strong"):
+                row["strong"] = True
             if r.get("floor") is not None:      # judged once already: a watched name Google now completes
                 row["floor"] = max(row.get("floor", 0), r["floor"])
     rows = list(out.values())
@@ -47,7 +49,7 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
             r["named"] = max(r["named"], r["floor"])
     cut = cfg["judge"]["min_score"]
     # Earliest signal first among equals: a name the labs said today beats a sitemap echo.
-    rows.sort(key=lambda r: (-(r.get("named", 0) >= cut), -len(r["kinds"]),
+    rows.sort(key=lambda r: (-(r.get("named", 0) >= cut), -r.get("strong", False), -len(r["kinds"]),
                              min(KINDS.index(k) for k in r["kinds"]), opportunity.RANK[r["format"]], -r.get("named", 0)))
     return rows, status
 
@@ -460,7 +462,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     lines += posts_lines(top)
     lines.append("")
     for key, label in (("x", "st_x"), ("hf", "st_hf")):
-        if b[key].get("error"):
+        if b.get(key, {}).get("error"):
             lines.append(t(label, state=b[key]["error"]))
     tk = b.get("tiktok", {"skipped": True})
     if not tk.get("skipped"):
@@ -488,7 +490,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("judge", "st_judge"), ("record", "st_record")):
         if extra.get(key, {}).get("error"):
             lines.append(t(label, state=extra[key]["error"]))
-    lines.append(t("cost", cost=_cost(b["x"], b.get("tiktok", {}))))
+    lines.append(t("cost", cost=_cost(b.get("x", {}), b.get("tiktok", {}), b.get("searchwords", {}))))
     return "\n".join(lines) + "\n"
 
 

@@ -26,6 +26,9 @@ from . import UA, snap
 from .i18n import t
 
 SUGGEST = "https://suggestqueries.google.com/complete/search"
+# A completion with one of these asks for a template: "hotel lobby ai video", "burning bridges ai video generator free".
+# Without, "bulin 47 ai" alone, the need is there but its shape is not: a weak lead, for a person to read.
+TEMPLATE = re.compile(r"\b(video|videos|trend|filter|meme|generator|template|effect|edit|prompt|prompts|app)\b")
 TIMEOUT = 15
 _AI = re.compile(r"\bai\b")
 
@@ -65,11 +68,18 @@ def add(cfg: dict, state: Path, lead: list[dict], today: date | None = None) -> 
     return joined
 
 
+def strong(completions: list[str]) -> bool:
+    return any(TEMPLATE.search(c.lower()) for c in completions)
+
+
 def _term(w: dict, today: date) -> dict:
     found = w["completions"]
     days = (date.fromisoformat(w["found"]) - date.fromisoformat(w["added"])).days
+    sure = strong(found)
+    top = next((c for c in found if TEMPLATE.search(c.lower())), found[0])
     return {"term": w["term"], "examples": found[:3], "variants": [w["term"], f"{w['term']} ai", *found[:3]],
-            "recent": len(found), "floor": w.get("score"), "note": t("note_demand", top=found[0], n=len(found), days=days)}
+            "recent": len(found), "floor": w.get("score"), "strong": sure,
+            "note": t("note_demand_strong" if sure else "note_demand_weak", top=top, n=len(found), days=days)}
 
 
 def check(cfg: dict, state: Path, today: date | None = None) -> dict:
