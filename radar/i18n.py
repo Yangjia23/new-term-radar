@@ -84,7 +84,7 @@ T = {
     "demand_new": (" · rising since {day}, {now}", " · {day} 起涨,{now}"),
     "demand_tiny": (" · too few searches for a Trends curve yet", " · 搜索量还太小,Trends 画不出曲线"),
     "now_rising": ("still rising", "还在涨"), "now_holding": ("holding", "维持高位"), "now_fading": ("fading", "已回落"),
-    "now_flat": ("flat", "平稳"),
+    "now_flat": ("flat", "平稳"), "now_spike": ("a first spike", "刚冒头"),
     "st_watch_old": ("; {n} searched for months already, not pushed: {terms}", ";{n} 个是老词,未推送:{terms}"),
     "st_watch": ("- watch list: {state}", "- 需求观察:{state}"),
     "st_watch_ok": ("{watching} names watched, {read} looked up, {found} searched with ai, {added} joined",

@@ -193,6 +193,15 @@ def test_fresh_tells_a_new_rise_from_a_meme_of_may(monkeypatch):
     assert cost == 9600
 
 
+def test_one_day_of_searches_out_of_nothing_is_a_first_spike():
+    spike = {"no_data": False, "new": False, "rose": False, "base": 0, "peak": 100, "peak_day": "2026-10-15", "now": "flat"}
+    assert watch._spike(spike, TODAY)["new"] and watch._spike(spike, TODAY)["now"] == "spike"
+    assert not watch._spike({**spike, "base": 42}, TODAY)["new"]                   # searched before
+    assert not watch._spike({**spike, "peak_day": "2026-08-01"}, TODAY)["new"]      # an old peak
+    # "reporter voice ai": one spike on 09-14, zeros since; the window's "peak" is a zero
+    assert not watch._spike({**spike, "base": 1.8, "peak": 0, "peak_day": "2026-10-17"}, TODAY)["new"]
+
+
 def test_a_completion_naming_a_template_is_strong_the_name_alone_is_weak(tmp_path, monkeypatch):
     assert watch.strong(["hotel lobby ai video", "hotel lobby ai"]) and watch.strong(["burning bridges ai video generator free"])
     assert not watch.strong(["bulin 47 ai"]) and not watch.strong(["reporter voice ai", "news reporter voice ai"])

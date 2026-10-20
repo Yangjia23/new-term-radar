@@ -31,7 +31,7 @@ from pathlib import Path
 
 from . import UA, aisa, review, snap
 from .i18n import t
-from .usecases import shape
+from .usecases import NEW_BASE_MAX, shape
 
 SUGGEST = "https://suggestqueries.google.com/complete/search"
 # A completion with one of these asks for a template: "hotel lobby ai video", "burning bridges ai video generator free".
@@ -42,6 +42,7 @@ TIMEOUT = 15
 # against the 69 before. Under usecases.NEW_BASE_MAX before, the name is new.
 FRESH_DAYS = 90
 FRESH = {"unsettled": review.UNSETTLED_DAYS, "window": 21, "factor": review.RISE_FACTOR, "days": 2}
+SPIKE_PEAK = 50       # of 100: a one-day spike in the window counts when it is the series' high
 _AI = re.compile(r"\bai\b")
 
 
@@ -115,8 +116,20 @@ def fresh(terms: list[str], today: date) -> tuple[dict[str, dict], int]:
         ai, bare = curves.get(f"{term} ai"), curves.get(term)
         pick = ai if ai and not ai.get("no_data") else bare if bare else ai
         if pick is not None:
-            out[term] = pick
+            out[term] = _spike(pick, today)
     return out, cost
+
+
+def _spike(curve: dict, today: date) -> dict:
+    """A curve too thin for a two-day rise, out of nothing and at its highest in the window, is new
+    too: "zombie couple ai" read 0 for 89 days and 100 on 15 October 2026, the week its domains were
+    registered. "reporter voice ai" (09-14) and "letter k ai" (09-08) had their one day before the
+    window and nothing in it: their window peak is 0, not their spike."""
+    start = (today - timedelta(days=FRESH["unsettled"] + FRESH["window"])).isoformat()
+    if curve.get("no_data") or curve.get("new") or curve["base"] >= NEW_BASE_MAX or curve["peak"] < SPIKE_PEAK \
+            or curve["peak_day"] < start:
+        return curve
+    return {**curve, "new": True, "started": curve["peak_day"], "now": "spike"}
 
 
 def check(cfg: dict, state: Path, today: date | None = None) -> dict:
