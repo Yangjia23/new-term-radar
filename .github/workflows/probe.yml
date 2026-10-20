@@ -1,10 +1,15 @@
 name: Probe TikTok charts
 
-# One manual look at TikTok's other charts (scripts/probe_tiktok.py); the raw answers and
-# a judged list come back as the "probe" artifact. Touches no state.
+# One manual look, run by hand: TikTok's other charts (scripts/probe_tiktok.py) or the watch
+# list's Trends check on names whose answer is known (scripts/probe_fresh.py). The output
+# comes back as the "probe" artifact. Touches no state.
 
 on:
   workflow_dispatch:
+    inputs:
+      script:
+        description: "probe_tiktok (the other TikTok charts) or probe_fresh (the watch list's Trends check on known names)"
+        default: "probe_tiktok"
 
 permissions:
   contents: read
@@ -27,7 +32,7 @@ jobs:
           AISA_API_KEY: ${{ secrets.AISA_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          python scripts/probe_tiktok.py
+          python scripts/${{ github.event.inputs.script || 'probe_tiktok' }}.py
           cat probe/report.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
