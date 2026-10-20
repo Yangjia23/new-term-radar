@@ -6,7 +6,7 @@
   "x_accounts": {"labs": [], "bloggers": []},
   "sitemaps": {},
 
-  "domains": {"window_days": 3, "history_days": 30, "min_domains": 3, "min_domains_ai": 2, "min_lift": 3, "min_len": 5, "max_terms": 25},
+  "domains": {"window_days": 3, "history_days": 30, "min_domains": 3, "min_domains_ai": 2, "min_lift": 3, "min_len": 5, "max_terms": 25, "intent_floor": 2, "site_hosts": 4},
   "rising": {
     "seeds": ["higgsfield", "pixverse", "kling ai", "hailuo ai", "seedance", "dreamina", "viggle ai",
               "ai video", "ai trend", "ai video generator"],

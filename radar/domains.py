@@ -43,7 +43,7 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import UA, snap
+from . import UA, sites, snap
 from .i18n import t
 
 INDEX = "https://www.whoisds.com/newly-registered-domains"
@@ -53,6 +53,7 @@ EXAMPLES = 6
 RDAP = "https://rdap.verisign.com/com/v1/domain/"
 SAMPLE = 8
 RECENT_DAYS = 10    # a sampled domain registered longer ago than this was re-registered, not new
+SITE_FLOOR = 0.9    # the score of a wave one of whose sites is already a tool for it
 INTENT = {"ai", "ia", "video", "videos", "aivideo", "videoai"}
 # Cut off around the name, as a word between hyphens or glued to either end. "ia" (Spanish
 # for AI) only between hyphens: glued, it is the end of media, india, academia.
@@ -281,6 +282,7 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
         r["note"] = t("note_domain", n=r["domains"], tlds=r["tlds"], day=r["registered"]) if regs else \
             t("note_domain_list", n=r["domains"], tlds=r["tlds"], day=r["first_day"][5:])
         reported[r["core"]] = today.isoformat()
+    _vouch(cfg, rows, errors)
     snap.save(rpath, reported)
     snap.save(mpath, {d: v for d, v in measured.items() if d in kept})
     out = {"read": read, "window": win_days, "history_days": len(past_days), "first_run": first_run, "terms": rows,
@@ -288,3 +290,26 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
     if errors:
         out["errors"] = errors
     return out
+
+
+def _vouch(cfg: dict, rows: list[dict], errors: list[str]) -> None:
+    """Scores the judge may not take from the word alone. "flying car" reads as an everyday word
+    (0.2 on 19 October 2026); two of its eight new domains carried "ai", and two of its sites were
+    already "Flying Car AI Video Generator". A wave with `intent_floor` domains with ai or video
+    is kept at the judge's cut, a weak lead for a person to read; one whose site is a tool for it
+    is a strong lead, its site first among the examples."""
+    c = cfg["domains"]
+    try:
+        found = sites.tools(rows, c["site_hosts"]) if rows and c.get("site_hosts") else {}
+    except Exception as exc:  # noqa: BLE001 — the waves are reported without it
+        found = {}
+        errors.append(f"sites: {type(exc).__name__}: {str(exc)[:100]}")
+    for r in rows:
+        if c.get("intent_floor") and r["intent"] >= c["intent_floor"]:
+            r["floor"] = cfg.get("judge", {}).get("min_score", 0.5)
+            r["note"] += t("note_domain_intent", n=r["intent"])
+        if r["core"] in found:
+            host, title = found[r["core"]]
+            r["floor"], r["strong"] = SITE_FLOOR, True
+            r["note"] += t("note_domain_site", host=host, title=title)
+            r["examples"] = [host] + [d for d in r["examples"] if d != host]

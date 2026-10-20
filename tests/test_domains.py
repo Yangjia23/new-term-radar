@@ -5,7 +5,7 @@ import json
 from datetime import date, timedelta
 
 from radar import __main__ as cli
-from radar import config, domains, notify, report, usecases
+from radar import config, domains, notify, report, sites, usecases
 
 C = copy.deepcopy(config.DEFAULTS["domains"])
 TODAY = date(2026, 10, 16)
@@ -75,13 +75,14 @@ def test_a_list_is_labelled_with_the_days_its_domains_were_registered(monkeypatc
 def test_diff_keeps_each_list_reports_once_and_survives_a_bad_day(tmp_path, monkeypatch):
     cfg = {"domains": C}
     monkeypatch.setattr(domains, "days_of", lambda day, listed: [(date.fromisoformat(day) - timedelta(days=2)).isoformat()])
+    monkeypatch.setattr(sites, "look", lambda host: "")
     lists = {"2026-10-14": "u1", "2026-10-15": "u2", "2026-10-16": "u3"}
     monkeypatch.setattr(domains, "available", lambda: lists)
     monkeypatch.setattr(domains, "download", lambda url: WAVE if url == "u3" else ["quiet.com"])
     first = domains.diff(cfg, tmp_path, TODAY)
     assert first["first_run"] and first["read"] == list(lists) and first["window"] == list(lists)
     assert {r["core"] for r in first["terms"]} >= {"hotellobby", "bulin47"} and first["terms"][0]["first_day"] == "2026-10-16"
-    assert first["terms"][0]["registered"] == "10-14" and first["terms"][0]["note"].endswith("registered 10-14")
+    assert first["terms"][0]["registered"] == "10-14" and "registered 10-14;" in first["terms"][0]["note"]
     again = domains.diff(cfg, tmp_path, TODAY)
     assert again["read"] == [] and again["terms"] == []                     # kept on disk, and reported already
     (tmp_path / "domains" / "registered.json.gz").unlink()
@@ -93,6 +94,44 @@ def test_diff_keeps_each_list_reports_once_and_survives_a_bad_day(tmp_path, monk
     monkeypatch.setattr(domains, "download", broken)
     late = domains.diff(cfg, tmp_path, TODAY + timedelta(days=1))
     assert "2026-10-17: OSError: timed out" in late["errors"][0] and late["window"] == list(lists)
+
+
+# Two of the eight domains registered for "flying car" from 16 to 17 October 2026, as their home pages read on the 20th.
+PAGES = {
+    "flyingcarai.art": '<title>Flying Car AI &ndash; Launch Your Car Off the Viral Ramp From One Photo</title>'
+                       '<meta name="description" content="Upload one photo and get the stunt video in minutes.">',
+    "flyingcar.dev": "<title>flyingcar.dev for sale | Spaceship.com</title>",
+}
+
+
+def test_a_site_is_a_tool_when_its_page_names_the_word_and_an_ai_tool():
+    assert sites.head(PAGES["flyingcarai.art"]).startswith("Flying Car AI – Launch Your Car")
+    assert sites.tool("flyingcar", sites.head(PAGES["flyingcarai.art"]))
+    assert sites.tool("flyingcar", "Flying Car AI Video Generator | Ramp Stunt from a Photo")
+    assert not sites.tool("flyingcar", sites.head(PAGES["flyingcar.dev"]))          # parked for sale
+    assert not sites.tool("flyingcar", "AllFlyingCars: Flying Car Prices and Release Dates")
+    assert not sites.tool("hotellobby", "Flying Car AI Video Generator")          # a tool, for another word
+
+
+def test_waves_with_ai_domains_keep_the_cut_and_a_live_tool_makes_them_strong(monkeypatch):
+    monkeypatch.setattr(sites, "look", lambda host: sites.head(PAGES.get(host, "")))
+    rows = [{"core": "flyingcar", "intent": 2, "note": "n", "examples": ["flyingcar.dev", "flyingcarai.art"]},
+            {"core": "crazyfrog", "intent": 2, "note": "n", "examples": ["crazyfrogai.pro"]},
+            {"core": "boxtruck", "intent": 0, "note": "n", "examples": ["boxtruck.now"]}]
+    errors = []
+    domains._vouch({"domains": C, "judge": {"min_score": 0.4}}, rows, errors)
+    car, frog, truck = rows
+    assert car["floor"] == domains.SITE_FLOOR and car["strong"] and car["examples"][0] == "flyingcarai.art"
+    assert "flyingcarai.art" in car["note"] and "Flying Car AI" in car["note"]
+    assert frog["floor"] == 0.4 and not frog.get("strong") and "2" in frog["note"]
+    assert "floor" not in truck and truck["note"] == "n" and errors == []
+
+
+def test_a_floor_lifts_the_judges_score_in_the_lead(cfg, monkeypatch):
+    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus: [r.update(named=0.2) for r in rows] and {"judged": len(rows)})
+    row = {"term": "flying car", "recent": 5, "lift": 5.0, "note": "n", "examples": [], "floor": 0.9, "strong": True}
+    lead, _ = report.leads(cfg, {"domain": {"terms": [row]}})
+    assert lead[0]["named"] == 0.9 and lead[0]["strong"] and report.to_push(cfg, lead)
 
 
 def test_diff_with_nothing_online_and_nothing_kept_says_so(tmp_path, monkeypatch):
