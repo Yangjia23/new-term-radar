@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       script:
-        description: "probe_tiktok (the other TikTok charts) or probe_fresh (the watch list's Trends check on known names)"
+        description: "probe_tiktok (other TikTok charts), probe_fresh (the watch list Trends check on known names) or probe_series (raw Trends series)"
         default: "probe_tiktok"
 
 permissions:
