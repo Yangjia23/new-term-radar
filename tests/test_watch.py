@@ -106,7 +106,18 @@ def test_a_name_leaves_the_list_after_the_watch_days(tmp_path, monkeypatch):
     cfg = _cfg()
     watch.add(cfg, tmp_path, [_lead("foam mirror", ["searchwords"], 0.7)], TODAY)
     _google(monkeypatch, {})
-    assert watch.check(cfg, tmp_path, date(2026, 11, 20))["watching"] == 0
+    assert watch.check(cfg, tmp_path, date(2026, 10, 30))["watching"] == 0          # 11 days on
+
+
+def test_names_under_the_watch_score_stay_out_and_leave_when_it_is_raised(tmp_path, monkeypatch):
+    cfg = _cfg()
+    assert watch.add(cfg, tmp_path, [_lead("moo doja cat", ["searchwords"], 0.4), _lead("foam mirror", ["searchwords"], 0.7)], TODAY) == 1
+    cfg["watch"]["min_score"] = 0.3
+    watch.add(cfg, tmp_path, [_lead("moo doja cat", ["searchwords"], 0.4)], TODAY)
+    _google(monkeypatch, {})
+    assert watch.check(cfg, tmp_path, TODAY)["watching"] == 2
+    cfg["watch"]["min_score"] = 0.6
+    assert watch.check(cfg, tmp_path, TODAY)["watching"] == 1
 
 
 def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(tmp_path, monkeypatch, capsys):

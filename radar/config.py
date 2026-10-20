@@ -28,7 +28,9 @@ DEFAULTS = {
     "rising": {"seeds": [], "window": "now 7-d", "geo": "", "min_rise": 1000, "reserve": 20},   # needs SERPAPI_API_KEY
     "tiktok": {"countries": [], "pages": 2, "days": 7},     # trending hashtags, through AIsa
     "searchwords": {"on": False},   # TikTok's trending searches, through AIsa; they feed the watch list
-    "watch": {"kinds": ["searchwords", "tiktok", "pages"], "days": 21, "max_lookups": 60, "pause": 1, "gl": "us"},
+    # min_score over the judge's: some 300 TikTok searches a day pass 0.4, a list of thousands that
+    # 60 lookups an hour would not get through once a day
+    "watch": {"kinds": ["searchwords", "tiktok", "pages"], "min_score": 0.6, "days": 10, "max_lookups": 60, "pause": 1, "gl": "us"},
     "pages": {},                # trend pages new to an AI tool site's sitemap (Dreamina), see radar/pages.py
     "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run
     "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"],   # the signals whose new names are pushed to Feishu

@@ -6,7 +6,7 @@ to "hotel lobby ai video", "... ai filter", "... ai trend", and "burning bridges
 TikTok the same day, completed to nothing. The day Google starts completing "<name> ai"
 is the day people look for the tool.
 
-Names the judge scored at or over judge.min_score from the kinds in watch.kinds join the
+Names the judge scored at or over watch.min_score from the kinds in watch.kinds join the
 list. Once a day each is looked up in Google's autocomplete (free, one request a name,
 `pause` seconds apart); the first time a completion holds the name and "ai", it becomes a
 "demand" lead with those completions, and is not looked up again. A name leaves the list
@@ -69,7 +69,7 @@ def add(cfg: dict, state: Path, lead: list[dict], today: date | None = None) -> 
     today = today or date.today()
     path = state / "watch.json.gz"
     kept: dict[str, dict] = snap.load(path) or {}
-    kinds, cut, joined = set(cfg["watch"]["kinds"]), cfg["judge"]["min_score"], 0
+    kinds, cut, joined = set(cfg["watch"]["kinds"]), cfg["watch"]["min_score"], 0
     for r in lead:
         key = r["term"].replace(" ", "")
         if key in kept or r["known"] or not kinds & set(r["kinds"]) or r.get("named", 0) < cut:
@@ -142,7 +142,8 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
     path = state / "watch.json.gz"
     kept: dict[str, dict] = snap.load(path) or {}
     cutoff = (today - timedelta(days=c["days"])).isoformat()
-    kept = {k: w for k, w in kept.items() if w["added"] >= cutoff or w["found"]}
+    # found names stay (never looked up again); the rest leave after `days`, or under a raised min_score
+    kept = {k: w for k, w in kept.items() if w["found"] or (w["added"] >= cutoff and (w.get("score") or 0) >= c["min_score"])}
     due = [w for w in kept.values() if not w["found"] and w["checked"] != today.isoformat()][:c["max_lookups"]]
     hits, errors = [], []
     for i, w in enumerate(due):
