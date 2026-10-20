@@ -1,0 +1,22 @@
+# Starts the radar's GitHub Actions runs on time. GitHub's own schedule drops or delays them
+# by hours (on 20 October 2026, 3 of 14 hourly runs started); a workflow_dispatch starts
+# within a minute. The jobs themselves still run on GitHub.
+#
+#   npx wrangler deploy
+#   npx wrangler secret put GITHUB_TOKEN   # fine-grained, this repository only, Actions: read and write
+name = "new-term-radar-trigger"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[vars]
+REPO = "Yangjia23/new-term-radar"
+WORKFLOW = "radar.yml"
+REF = "main"
+
+# UTC, as the workflow's schedule was
+[triggers]
+crons = ["0 0,8,16 * * *", "15 9 * * *", "30 * * * *"]
+
+[observability]
+enabled = true

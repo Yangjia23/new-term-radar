@@ -24,11 +24,11 @@ name: New-term radar
 # would start over, so download the "radar-state" artifact now and then if you care
 # about the review's history.
 
+# The schedule lives in a Cloudflare Worker (trigger/), which starts each run through
+# workflow_dispatch: GitHub's own schedule dropped or delayed them by hours (on 20 October
+# 2026, 3 of 14 hourly runs started, the daily report 7 hours late). UTC:
+#   0 0,8,16 * * *  sources    15 9 * * *  daily    30 * * * *  searchwords
 on:
-  schedule:
-    - cron: "0 0,8,16 * * *"   # sources
-    - cron: "15 9 * * *"       # daily
-    - cron: "30 * * * *"       # searchwords: TikTok's trending searches change within the hour
   workflow_dispatch:
     inputs:
       command:
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      COMMAND: ${{ github.event.inputs.command || (github.event.schedule == '15 9 * * *' && 'daily') || (github.event.schedule == '30 * * * *' && 'searchwords') || 'sources' }}
+      COMMAND: ${{ github.event.inputs.command || 'daily' }}
     steps:
       - uses: actions/checkout@v4
 
