@@ -138,6 +138,13 @@ TITLES = {
     "memevideomaker.com": "Meme Video Maker: Create Short AI Videos from Photos",
     "nsfwphototovideo.com": "NSFW Photo to Video · AI Image to Video Generator, 18+",
     "toctocaidance.com": "",
+    # of the list of 21 October: a description names video and trends for any AI product
+    "vitreai.online": "Vitre AI | AI ads. Human taste. | AI-native statics, video and UGC for Meta",
+    "halal-trade-ai.top": "Halal Trade AI — Sharia-Conscious AI Trading Forecasts for the UAE & GCC",
+    "viralaivideoplaybook.com": "Viral AI Video Playbook | One-time purchase.",
+    "aidetector360.com": "AI Detector 360 — Free AI Detector for Text, Images & Video",
+    "hivideostudio.com": "HiVideoStudio — Trending AI Video Effects in One Studio",
+    "hittheroaddudeai.lol": "Hit the Road Dude AI: Talking Pet Meme Video Generator | Turn a cat or dog photo into a video",
 }
 
 
@@ -147,7 +154,9 @@ def test_a_single_site_names_its_trend_from_its_title():
     assert name("teslaroadsteraivideo.fun") == ("tesla roadster", "teslaroadster")
     assert name("catclappingai.org") == ("cat clapping", "catclapping")
     assert name("zombieaimaker.com") == ("zombie", "zombie")
-    for host in ("stoneai.co.in", "proxlai.com", "aivsgames.com", "memevideomaker.com", "nsfwphototovideo.com"):
+    assert name("hittheroaddudeai.lol") == ("hit the road dude", "hittheroaddude")
+    for host in ("stoneai.co.in", "proxlai.com", "aivsgames.com", "memevideomaker.com", "nsfwphototovideo.com", "vitreai.online",
+                 "halal-trade-ai.top", "viralaivideoplaybook.com", "aidetector360.com", "hivideostudio.com"):
         assert name(host) is None, host
     assert sites.name("toctocaidance", "Toc Toc AI Video Generator | Toc Toc Dance from One Photo") == ("toc toc", "toctoc")
 
@@ -159,7 +168,7 @@ def test_single_sites_of_todays_lists_are_leads_and_a_silent_one_is_read_again(t
     reported = {"catclapping": "2026-10-10"}
     out = domains._look({"domains": C}, tmp_path, [], fresh, reported, TODAY, [])
     by = {r["term"]: r for r in out}
-    assert set(by) == {"thriller dance", "tesla roadster", "zombie"}       # cat clapping was reported already
+    assert set(by) == {"thriller dance", "tesla roadster", "zombie", "hit the road dude"}       # cat clapping was reported already
     r = by["thriller dance"]
     assert r["strong"] and r["floor"] == domains.SITE_FLOOR and r["examples"] == ["thrillerdanceai.com"]
     assert "Thriller Dance AI Video Generator" in r["note"] and reported["thrillerdance"] == TODAY.isoformat()

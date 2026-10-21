@@ -26,6 +26,8 @@ TOOL = re.compile(r"\bai\b.*\b(video|videos|generator|filter|effect|template|mak
 # A single site is a template for a trend: a video, a dance, a filter, a meme, made from a photo.
 # "StoneAI — AI Website Builder", "Proxlai: prices for every AI API" are tools, not for a trend.
 TEMPLATE = re.compile(r"\b(videos?(?! games?)|dance|filter|meme|effect|duet|trend)\b|\bfrom (one|a|your|1|2|1–2|1-2) (car )?(photo|picture|selfie)")
+# AI products that are not a template for a trend.
+OTHER = re.compile(r"detector|humani[sz]er|chatbot|trading|website builder|\bapi\b|playbook|course")
 ADULT = re.compile(r"nsfw|porn|nude|hentai|18\+|xxx")
 # What a title says before "AI": "Flying Car AI Video Generator", "Toc Toc AI – ...".
 _LEAD = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9 '&.-]{1,40}?)\s+AI\b")
@@ -33,7 +35,8 @@ _LEAD = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9 '&.-]{1,40}?)\s+AI\b")
 GENERIC = {"making", "make", "free", "best", "online", "create", "the", "my", "your", "pro", "smart", "easy", "top",
            "video", "videos", "photo", "image", "art", "magic", "super", "ultimate", "simple", "fast", "instant",
            "creative", "studio", "mastery", "master", "trend", "trends", "viral", "meme", "dance", "style", "styles",
-           "ai", "maker", "generator", "filter", "effect", "edit", "editor", "app", "tool", "tools"}
+           "ai", "maker", "generator", "filter", "effect", "edit", "editor", "app", "tool", "tools", "hi", "hub", "lab",
+           "labs", "playbook", "guide", "academy", "baby", "pet", "cat", "dog", "kids", "couple", "selfie", "face"}
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _META = re.compile(r"<meta\b[^>]*>", re.I)
 _CONTENT = re.compile(r"""content\s*=\s*["']([^"']*)["']""", re.I)
@@ -76,20 +79,24 @@ def heads(hosts: list[str]) -> dict[str, str]:
 
 
 def name(core: str, text: str) -> tuple[str, str] | None:
-    """(name, core) of the trend a single new site is a tool for, None when it is not one. The name is
-    what its title puts before "AI" ("Thriller Dance AI Video Generator" -> "thriller dance"), when
-    the domain holds it: toctocaidance.com is "toc toc". A title naming no trend ("Making AI
-    Videos", "AI Video Generator") is not one."""
-    low = text.lower()
-    if not (TOOL.search(low) and TEMPLATE.search(low)) or ADULT.search(low):
+    """(name, core) of the trend a single new site is a template for, None when it is not one. Read
+    from the title alone: descriptions name video and trends for any AI product ("Vitre AI", an ad
+    studio). The name is what the title puts before "AI" ("Thriller Dance AI Video Generator" ->
+    "thriller dance") when the domain holds it, toctocaidance.com being "toc toc"; else the
+    domain's core when the title opens with it ("Zombie Filter – ... with AI", "AI Baby Dance Video
+    Generator"). A title naming no trend ("Viral AI Video Playbook") is not one."""
+    title = text.split(" | ")[0]
+    low = title.lower()
+    if not (TOOL.search(low) and TEMPLATE.search(low)) or ADULT.search(low) or OTHER.search(low):
         return None
-    m = _LEAD.match(text)
+    m = _LEAD.match(title)
     if m:
         lead = " ".join(m.group(1).lower().split())
         flat = re.sub(r"[^a-z0-9]", "", lead)
         if len(flat) >= 5 and flat in core and not _generic(flat):
             return lead, flat
-    return (core, core) if len(core) >= 6 and tool(core, text) and not _generic(core) else None
+    opening = re.sub(r"^ai", "", re.sub(r"[^a-z0-9]", "", low))
+    return (core, core) if len(core) >= 6 and opening.startswith(core) and not _generic(core) else None
 
 
 def _generic(flat: str) -> bool:
