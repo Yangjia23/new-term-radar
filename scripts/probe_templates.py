@@ -69,6 +69,23 @@ def names(v: dict) -> set[str]:
     return out
 
 
+def each(calls: list[dict]) -> tuple[dict, dict, int]:
+    """Every call alone, so one bad call says why instead of failing the batch."""
+    data, errors, cost = {}, {}, 0
+    for c in calls:
+        try:
+            d, n = aisa.call([c])
+        except aisa.AisaError as exc:
+            errors[c["call_id"]] = str(exc)[:300]
+            continue
+        cost += n
+        if c["call_id"] in d:
+            data[c["call_id"]] = d[c["call_id"]]
+        else:
+            errors[c["call_id"]] = "failed"
+    return data, errors, cost
+
+
 def main() -> int:
     out = Path("probe")
     out.mkdir(exist_ok=True)
@@ -76,7 +93,7 @@ def main() -> int:
     first += [{"call_id": f"q{i}_{p}", "tool": SEARCH,
                "arguments": {"keyword": q, "offset": p * 20, "count": 20, "sort_type": 0, "publish_time": 1}}
               for i, q in enumerate(QUERIES) for p in range(PAGES)]
-    data, cost = aisa.call_all(first)
+    data, errors, cost = each(first)
     ids = {}
     for t in TAGS:
         info = (data.get(f"c_{t}") or {}).get("data", data.get(f"c_{t}") or {})
@@ -84,16 +101,19 @@ def main() -> int:
         cid = ch.get("cid") or ch.get("id") or info.get("cid")
         if cid:
             ids[t] = cid
+        elif f"c_{t}" in data:
+            errors[f"c_{t}"] = "no id in " + json.dumps(data[f"c_{t}"])[:300]
     second = [{"call_id": f"p_{t}_{p}", "tool": POSTS, "arguments": {"ch_id": cid, "cursor": p * 20, "count": 20}}
               for t, cid in ids.items() for p in range(PAGES)]
-    more, cost2 = aisa.call_all(second) if second else ({}, 0)
+    more, errors2, cost2 = each(second)
     data.update(more)
+    errors.update(errors2)
     (out / "raw.json").write_text(json.dumps(data, ensure_ascii=False)[:8_000_000])
 
     lines = ["# Template videos of the last day", "", "## Answers", ""]
     for c in first + second:
         a = data.get(c["call_id"])
-        lines.append(f"- {c['call_id']} ({c['tool'].rsplit('_', 3)[-3:]}): {'no answer' if a is None else f'{len(_items(a))} videos'}")
+        lines.append(f"- {c['call_id']} ({c['tool'].rsplit('_', 3)[-3:]}): {errors.get(c['call_id'], 'no answer') if a is None else f'{len(_items(a))} videos'}")
     lines.append(f"- hashtag ids: {ids}")
     videos = {}
     for k, a in data.items():
