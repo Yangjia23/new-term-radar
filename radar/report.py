@@ -475,7 +475,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
         lines.append(t("st_searchwords", state=_state(sw, ok)))
     wd = b.get("demand", {"skipped": True})
     if not wd.get("skipped"):
-        ok = "" if wd.get("error") else t("st_watch_ok", watching=wd["watching"], read=wd["read"], found=len(wd["terms"]),
+        ok = "" if wd.get("error") else t("st_watch_ok", watching=wd["watching"], read=wd["read"], tiktok=wd.get("tiktok_read", 0), found=len(wd["terms"]),
                                             added=(extra.get("watch") or {}).get("added", 0))
         if wd.get("old"):
             ok += t("st_watch_old", n=len(wd["old"]), terms=", ".join(wd["old"][:8]))

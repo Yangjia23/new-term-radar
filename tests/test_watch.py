@@ -26,6 +26,14 @@ def curves(monkeypatch):
     return by_term
 
 
+@pytest.fixture(autouse=True)
+def tiktok(monkeypatch):
+    """No name has AI versions on TikTok, unless a test says otherwise; the names searched are kept."""
+    found, asked = {}, []
+    monkeypatch.setattr(watch, "tiktok", lambda terms, n: (asked.extend(terms) or {k: found.get(k) for k in terms}, 1500 * len(terms)))
+    return found, asked
+
+
 def _cfg():
     c = copy.deepcopy(config.DEFAULTS)
     c["searchwords"]["on"] = True
@@ -241,3 +249,56 @@ def test_the_hourly_job_pushes_demand_and_nothing_else(tmp_path, monkeypatch):
     _day(monkeypatch, date(2026, 10, 20))
     cli.main(args)
     assert len(pushed) == 1 and "**foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1] and "rising since 10-12" in pushed[0][1]
+
+
+def _video(author, desc, plays=1000):
+    return {"aweme_info": {"create_time": 1792400000, "desc": desc, "author": {"unique_id": author},
+                           "statistics": {"play_count": plays}}}
+
+
+# Captions of 19 October 2026, for the TikTok search "dime dime baby ai" of the last week.
+DIME = {"data": {"search_item_list": [
+    _video("bella.moore54", "baby wow karol g dance trend bby wow guy dancing and eating original dime dime baby ai tutorial", 185122),
+    _video("lucy.bruce_win", "dime dime baby ai tutorial dime dime baby ai dance dime dime baby ai video", 580033),
+    _video("xqh626", "✨How to create the viral AI effect for the original Dime Dime Baby dance✨"),
+    _video("jcwb3u5", "#capcut #capcutpioneer dime dime baby ai tutorial dime dime baby ai dance"),
+    _video("zane.mercer4", "dime dime baby", 9143922),                     # the original clip: no AI in it
+    _video("cook", "best ai recipe tutorial for dinner"),                   # AI, but of something else
+]}}
+
+
+def test_ai_versions_go_by_the_name_their_captions_give():
+    videos = watch._videos(DIME)
+    assert len(videos) == 5                                                   # the original clip is not an AI version
+    found = watch.ai_versions("baby wow karol g", videos, 3)
+    assert found["name"] == "dime dime baby" and found["authors"] == 4 and found["plays"] == 185122 + 580033 + 2000
+    assert watch.ai_versions("dime dime baby", videos, 3)["name"] == "dime dime baby"
+    assert watch.ai_versions("dime dime baby", videos, 5) is None              # too few accounts
+    assert watch.ai_versions("foam mirror", videos, 1) is None                # not named at all
+
+
+def test_names_scored_high_are_searched_on_tiktok_and_pushed_under_the_ai_name(tmp_path, monkeypatch, tiktok):
+    found, asked = tiktok
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("baby wow karol g", ["searchwords"], 0.7), _lead("foam mirror", ["searchwords"], 0.6)], TODAY)
+    _google(monkeypatch, {})
+    found["baby wow karol g"] = watch.ai_versions("baby wow karol g", watch._videos(DIME), 3)
+    out = watch.check(cfg, tmp_path, TODAY)
+    assert asked == ["baby wow karol g"] and out["tiktok_read"] == 1          # foam mirror is under tiktok_min
+    (r,) = out["terms"]
+    assert r["term"] == "dime dime baby" and r["strong"] and r["floor"] == 0.7 and "baby wow karol g" in r["variants"]
+    assert r["note"].startswith("AI versions on TikTok: 4 accounts") and 'watched as "baby wow karol g"' in r["note"]
+    assert out["cost_micros"] == 1500
+    again = watch.check(cfg, tmp_path, TODAY + timedelta(days=1))
+    assert again["terms"] == [] and asked == ["baby wow karol g"]             # pushed once, not searched again
+
+
+def test_a_name_without_ai_versions_is_searched_on_tiktok_once_a_day(tmp_path, monkeypatch, tiktok):
+    _, asked = tiktok
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("toc toc", ["searchwords"], 0.8)], TODAY)
+    _google(monkeypatch, {})
+    assert watch.check(cfg, tmp_path, TODAY)["terms"] == []
+    watch.check(cfg, tmp_path, TODAY)
+    watch.check(cfg, tmp_path, TODAY + timedelta(days=1))
+    assert asked == ["toc toc", "toc toc"]

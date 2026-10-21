@@ -18,6 +18,14 @@ about $0.0024): when "<name> ai" rose in the last three weeks out of almost noth
 is pushed with the day it started; searched before, it is set aside as old and not pushed.
 "<name> ai" too small for a curve, the name alone decides; both too small, it is pushed and
 says so.
+
+Google completes a name days after the first sites for it are up. TikTok has the AI versions
+first: "toc toc ai dance tutorial" on 3 October 2026, its first site on the 9th, Google's
+completion on the 21st. So each name the judge scored at `tiktok_min` or over is also searched
+on TikTok once a day, "<name> ai" over the last week (about $0.0015 a search, `tiktok_max` a
+run): `tiktok_authors` accounts posting an AI version, a tutorial or a template push it at once.
+The AI versions may use another name than the one watched: "baby wow karol g", a TikTok search
+of 19 October, is "dime dime baby ai" in their captions, and is pushed under that name.
 """
 from __future__ import annotations
 
@@ -44,6 +52,14 @@ FRESH_DAYS = 90
 FRESH = {"unsettled": review.UNSETTLED_DAYS, "window": 21, "factor": review.RISE_FACTOR, "days": 2}
 SPIKE_PEAK = 50       # of 100: a one-day spike in the window counts when it is the series' high
 _AI = re.compile(r"\bai\b")
+VIDEO = "get_tikhub_tiktok_app_v3_fetch_video_search_result"
+# A caption of an AI version of a trend: "#ai", "ia" (Spanish), a CapCut template, a tutorial.
+AI_VERSION = re.compile(r"(?:^|[\s#])(ai|ia|aidance|aivideo|aitrend|aieffect|aifilter|capcutpioneer|pioneertemplate)\b"
+                        r"|\b(tutorial|template)\b")
+# The name an AI version goes by, read before "ai": "dime dime baby ai tutorial".
+_AI_NAME = re.compile(r"([a-z0-9][a-z0-9' ]{2,40}?)\s+(?:ai|ia)\s+(?:tutorial|dance|video|trend|effect|filter|template|edit)")
+_LEADING = {"the", "a", "original", "viral", "new", "how", "to", "make", "create", "do", "this", "trend", "tutorial",
+            "dance", "ai", "video", "and", "guy", "girl"}
 
 
 def _get(url: str) -> bytes:
@@ -132,6 +148,76 @@ def _spike(curve: dict, today: date) -> dict:
     return {**curve, "new": True, "started": curve["peak_day"], "now": "spike"}
 
 
+def _flat(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _videos(answer: dict) -> list[dict]:
+    data = answer.get("data", answer) if isinstance(answer, dict) else {}
+    out = []
+    for it in data.get("search_item_list") or data.get("aweme_list") or []:
+        a = it.get("aweme_info", it) if isinstance(it, dict) else {}
+        tags = " ".join("#" + x.get("hashtag_name", "") for x in a.get("text_extra") or [] if x.get("hashtag_name"))
+        text = " ".join(f"{a.get('desc') or ''} {tags}".lower().split())
+        if a.get("create_time") and AI_VERSION.search(text):
+            out.append({"author": (a.get("author") or {}).get("unique_id"), "text": text,
+                        "plays": (a.get("statistics") or {}).get("play_count") or 0})
+    return out
+
+
+def _ai_name(text: str) -> str | None:
+    m = _AI_NAME.search(re.sub(r"#\w+", " ", text))
+    if not m:
+        return None
+    words = m.group(1).split()[-4:]
+    while words and words[0] in _LEADING:
+        words.pop(0)
+    return " ".join(words) if len("".join(words)) >= 4 else None
+
+
+def ai_versions(term: str, videos: list[dict], min_authors: int) -> dict | None:
+    """The AI versions of `term` among a search's videos, when `min_authors` accounts posted them:
+    {"name", "authors", "videos", "plays", "example"}. The videos are those that name the term, or
+    the name its AI versions go by when one of them names both."""
+    key = _flat(term)
+    names: dict[str, set] = {}
+    for v in videos:
+        n = _ai_name(v["text"])
+        if n:
+            names.setdefault(n, set()).add(v["author"])
+    named = [v for v in videos if key in _flat(v["text"])]
+    alt = max((n for n in names if any(_flat(n) in _flat(v["text"]) for v in named)),
+              key=lambda n: (len(names[n]), len(n)), default=None)
+    keys = {key} | ({_flat(alt)} if alt else set())
+    mine = [v for v in videos if any(k in _flat(v["text"]) for k in keys)]
+    authors = {v["author"] for v in mine}
+    if len(authors) < min_authors:
+        return None
+    top = max(mine, key=lambda v: v["plays"])
+    name = alt if alt and _flat(alt) != key and len(names[alt]) >= 2 else term
+    return {"name": name, "authors": len(authors), "videos": len(mine), "plays": sum(v["plays"] for v in mine),
+            "example": f"@{top['author']}: {top['text'][:80]}"}
+
+
+def tiktok(terms: list[str], min_authors: int) -> tuple[dict[str, dict | None], int]:
+    """Each name's AI versions on TikTok over the last week, {term: ai_versions or None}. A failed
+    search leaves the name out."""
+    calls = [{"call_id": f"k{i}", "tool": VIDEO, "arguments": {"keyword": f"{term} ai", "offset": 0, "count": 20,
+                                                               "sort_type": 0, "publish_time": 7}}
+             for i, term in enumerate(terms)]
+    data, cost = aisa.call_all(calls)
+    return {term: ai_versions(term, _videos(data[f"k{i}"]), min_authors) for i, term in enumerate(terms) if f"k{i}" in data}, cost
+
+
+def _tiktok_term(w: dict) -> dict:
+    v = w["tiktok"]
+    name = v["name"]
+    return {"term": name, "examples": [v["example"]], "variants": list(dict.fromkeys([name, f"{name} ai", w["term"]])),
+            "recent": v["authors"], "floor": w.get("score"), "strong": True,
+            "note": t("note_tiktok_ai", n=v["authors"], videos=v["videos"], plays=f"{v['plays']:,}")
+                    + (t("note_tiktok_watched", term=w["term"]) if name != w["term"] else "")}
+
+
 def check(cfg: dict, state: Path, today: date | None = None) -> dict:
     """Looks up the names not yet looked up today. A name people now search with "ai" is read in
     Trends: new, it is a term; searched for months already, it is set aside as old."""
@@ -178,9 +264,26 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
             else:
                 w["old"] = True
                 old.append(w["term"])
+    seen = {w["term"] for w, _ in hits}
+    ask = [w for w in kept.values() if not w["found"] and w["term"] not in seen and (w.get("score") or 0) >= c["tiktok_min"]
+           and w.get("tchecked") != today.isoformat()][:c["tiktok_max"]]
+    if ask:
+        try:
+            found_tt, tcost = tiktok([w["term"] for w in ask], c["tiktok_authors"])
+        except aisa.AisaError as exc:     # looked up again next run
+            found_tt, tcost = {}, 0
+            errors.append(f"TikTok: {str(exc)[:100]}")
+        cost += tcost
+        for w in ask:
+            if w["term"] not in found_tt:
+                continue
+            w["tchecked"] = today.isoformat()
+            if found_tt[w["term"]]:
+                w["found"], w["tiktok"], w["emitted"] = today.isoformat(), found_tt[w["term"]], True
+                terms.append(_tiktok_term(w))
     snap.save(path, kept)
     out = {"read": len(due), "watching": sum(1 for w in kept.values() if not w["found"]), "terms": terms,
-           "old": old, "cost_micros": cost}
+           "old": old, "cost_micros": cost, "tiktok_read": len(ask)}
     if errors:
         out["errors"] = errors
         if len(errors) >= len(due):
