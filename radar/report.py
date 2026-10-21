@@ -568,10 +568,11 @@ def push(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, dict]
     uc = extra.get("usecases") or {}
     curve = {r["phrase"]: r for r in uc.get("rows", [])}
     live = (extra.get("ct") or {}).get("names", {})
+    pages = (extra.get("covered") or {}).get("pages", {})
     lines = []
     for i, r in enumerate(rows, 1):
         lines.append(f"{i}. **{r['term']}**{_marks(r)} · {'; '.join(r['signals'])}{_trend(curve.get(r['term']), uc.get('benchmark', ''))}"
-                     f"{_ct(live.get(r['term']))}")
+                     f"{_ct(live.get(r['term']))}{t('fs_dreamina', url=pages[r['term']]) if r['term'] in pages else ''}")
         if r["examples"]:
             lines.append(f"    {', '.join(r['examples'][:3])}")
     if errors:

@@ -47,10 +47,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, tiktok, usecases, watch
+from . import asks, breakout, config, covered, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, tiktok, usecases, watch
 from .i18n import t
 
-SKIPPABLE = {"x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"covered", "x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -88,6 +88,12 @@ def _live(args, cfg: dict, lead: list[dict]) -> dict:
     return run(lambda: ct.check(rows, cfg["ct"]), "ct" in args.skip or not args.feishu or not rows or not cfg["ct"]["max_lookups"])
 
 
+def _covered(args, cfg: dict, state: Path, lead: list[dict]) -> dict:
+    """The Dreamina pages of the names about to be pushed: a trend the big sites serve already."""
+    rows = report.to_push(cfg, lead)
+    return run(lambda: {"pages": covered.dreamina(state, [r["term"] for r in rows])}, "covered" in args.skip or not rows)
+
+
 def cmd_sources(args, cfg: dict, state: Path) -> int:
     blocks = {"x": run(lambda: sources.x_new(cfg, state), "x" in args.skip),
               "hf": run(lambda: sources.hf_new(cfg, state), "hf" in args.skip),
@@ -107,6 +113,7 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
     if report.named(cfg, lead) or errors:
         extra["ct"] = _live(args, cfg, lead)
+        extra["covered"] = _covered(args, cfg, state, lead)
         _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}",
                 report.push(cfg, lead, blocks, extra), _quiet(cfg, "sources", blocks))
     else:
@@ -129,6 +136,7 @@ def cmd_searchwords(args, cfg: dict, state: Path) -> int:
     if args.out:
         Path(args.out).write_text(text)
     print(text)
+    extra["covered"] = _covered(args, cfg, state, lead)
     _push(args, report.push(cfg, lead, blocks, extra))
     return 0
 
@@ -181,6 +189,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
         Path(args.out).with_suffix(".json").write_text(json.dumps(
             {"leads": lead, **blocks, "gsc": found, "review": rev, "summary": summ, "keywords": extra["usecases"]}, ensure_ascii=False, indent=1, default=str))
     extra["ct"] = _live(args, cfg, lead)
+    extra["covered"] = _covered(args, cfg, state, lead)
     _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra), _quiet(cfg, "daily", blocks))
     return 0
 

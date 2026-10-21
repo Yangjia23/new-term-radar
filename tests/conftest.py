@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from radar import aisa, config, ct, domains, goanyapi, i18n, rising, watch
+from radar import aisa, config, covered, ct, domains, goanyapi, i18n, rising, sites, watch
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +31,8 @@ def english(monkeypatch):
     def no_lookup(*a, **k):
         raise OSError("no network in tests")
     monkeypatch.setattr(ct, "issued", no_lookup)
+    monkeypatch.setattr(covered, "live", lambda url: False)                 # Dreamina's pages
+    monkeypatch.setattr(sites, "_get", no_download)                        # home pages
     # The page-one check runs only in the tests that set it up, whatever loads the config (the MCP server too).
     monkeypatch.setitem(config.DEFAULTS["competition"], "max_rows", 0)
     monkeypatch.setitem(config.DEFAULTS["asks"], "weekday", None)          # weekly signals stay off unless a test asks

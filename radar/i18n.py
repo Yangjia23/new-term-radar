@@ -127,6 +127,7 @@ T = {
     "fs_peak": (" · peak vs {bench}: {peak} vs {level}", " · 峰值 vs {bench}:{peak} vs {level}"),
     "fs_err": ("Failed: {why}", "异常:{why}"),
     "fs_ct": (" · CT: {live}/{checked} live, first {first}", " · CT:{live}/{checked} 已上线,最早 {first}"),
+    "fs_dreamina": (" · big sites have it already: {url}", " · 大平台已覆盖:{url}"),
     "fs_ct_none": (" · CT: none of {checked} live", " · CT:{checked} 个都还没上线"),
     "fs_link": ("[Full report]({url})", "[完整日报]({url})"),
     # daily report
