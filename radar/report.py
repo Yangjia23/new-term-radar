@@ -12,7 +12,7 @@ SHOWN = 20
 OTHER_TERMS = 15
 POSTS_SHOWN = 3   # posts quoted in full per term
 # signal key -> label key, in the order of how early the signal comes
-KINDS = ["demand", "x", "hf", "searchwords", "tiktok", "pages", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
+KINDS = ["demand", "x", "hf", "templates", "searchwords", "tiktok", "pages", "rising", "breakout", "domain", "sitemap", "newsite", "revenue", "ask", "usecase", "cosearch", "watch"]
 
 
 def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
@@ -473,6 +473,10 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     if not sw.get("skipped"):
         ok = "" if sw.get("error") else t("st_searchwords_ok", read=sw["read"], new=sw["new"])
         lines.append(t("st_searchwords", state=_state(sw, ok)))
+    tp = b.get("templates", {"skipped": True})
+    if not tp.get("skipped"):
+        ok = "" if tp.get("error") else t("st_templates_ok", read=tp["read"], new=tp["new"])
+        lines.append(t("st_templates", state=_state(tp, ok)))
     wd = b.get("demand", {"skipped": True})
     if not wd.get("skipped"):
         ok = "" if wd.get("error") else t("st_watch_ok", watching=wd["watching"], read=wd["read"], tiktok=wd.get("tiktok_read", 0), found=len(wd["terms"]),
@@ -492,7 +496,7 @@ def sources(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, di
     for key, label in (("judge", "st_judge"), ("record", "st_record")):
         if extra.get(key, {}).get("error"):
             lines.append(t(label, state=extra[key]["error"]))
-    lines.append(t("cost", cost=_cost(b.get("x", {}), b.get("tiktok", {}), b.get("searchwords", {}), b.get("demand", {}))))
+    lines.append(t("cost", cost=_cost(b.get("x", {}), b.get("tiktok", {}), b.get("searchwords", {}), b.get("templates", {}), b.get("demand", {}))))
     return "\n".join(lines) + "\n"
 
 

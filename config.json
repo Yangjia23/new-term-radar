@@ -18,6 +18,7 @@
                  "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]}
   },
   "searchwords": {"on": true},
+  "templates": {"on": true},
   "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"], "heartbeat": true},
 
   "blocklist": ["huangguo"],

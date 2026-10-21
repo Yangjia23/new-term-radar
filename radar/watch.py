@@ -265,8 +265,8 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
                 w["old"] = True
                 old.append(w["term"])
     seen = {w["term"] for w, _ in hits}
-    ask = [w for w in kept.values() if not w["found"] and w["term"] not in seen and (w.get("score") or 0) >= c["tiktok_min"]
-           and w.get("tchecked") != today.isoformat()][:c["tiktok_max"]]
+    ask = sorted((w for w in kept.values() if not w["found"] and w["term"] not in seen and (w.get("score") or 0) >= c["tiktok_min"]
+                  and w.get("tchecked") != today.isoformat()), key=lambda w: w.get("tchecked") or "")[:c["tiktok_max"]]   # new first
     if ask:
         try:
             found_tt, tcost = tiktok([w["term"] for w in ask], c["tiktok_authors"])

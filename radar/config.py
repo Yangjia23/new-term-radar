@@ -30,7 +30,9 @@ DEFAULTS = {
     "searchwords": {"on": False},   # TikTok's trending searches, through AIsa; they feed the watch list
     # min_score over the judge's: some 300 TikTok searches a day pass 0.4, a list of thousands that
     # 60 lookups an hour would not get through once a day
-    "watch": {"kinds": ["searchwords", "tiktok", "pages"], "min_score": 0.6, "days": 10, "max_lookups": 60, "pause": 1, "gl": "us",
+    # The hashtags of TikTok's AI template sellers, through AIsa; they feed the watch list
+    "templates": {"on": False, "min_authors": 2, "days": 7},
+    "watch": {"kinds": ["searchwords", "templates", "tiktok", "pages"], "min_score": 0.6, "days": 10, "max_lookups": 60, "pause": 1, "gl": "us",
               "tiktok_min": 0.7, "tiktok_max": 10, "tiktok_authors": 3},   # TikTok searched for AI versions: names at tiktok_min, tiktok_max a run
     "pages": {},                # trend pages new to an AI tool site's sitemap (Dreamina), see radar/pages.py
     "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run

@@ -302,3 +302,16 @@ def test_a_name_without_ai_versions_is_searched_on_tiktok_once_a_day(tmp_path, m
     watch.check(cfg, tmp_path, TODAY)
     watch.check(cfg, tmp_path, TODAY + timedelta(days=1))
     assert asked == ["toc toc", "toc toc"]
+
+
+def test_names_never_searched_on_tiktok_go_first(tmp_path, monkeypatch, tiktok):
+    _, asked = tiktok
+    cfg = _cfg()
+    cfg["watch"]["tiktok_max"] = 2
+    watch.add(cfg, tmp_path, [_lead("old one", ["searchwords"], 0.8), _lead("old two", ["searchwords"], 0.8)], TODAY)
+    _google(monkeypatch, {})
+    watch.check(cfg, tmp_path, TODAY)
+    watch.add(cfg, tmp_path, [_lead("broom riding", ["templates"], 0.8)], TODAY)
+    asked.clear()
+    watch.check(cfg, tmp_path, TODAY + timedelta(days=1))
+    assert asked[0] == "broom riding"                      # new, ahead of the two searched yesterday

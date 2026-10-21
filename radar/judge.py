@@ -41,7 +41,7 @@ SYSTEM_TRENDS = (
     "(a Migos performance people swap themselves into), 'bulin 47' (a street freestyle), 'rumpelstiltskin' (an AI clip that "
     "became a meme), 'burning bridges' (a Drake video scene), 'zombie couple' (an AI story format).\n"
     "For each term, score from 0.0 to 1.0 how likely it is such a trend. `examples` are where the term appeared: newly "
-    "registered domains, Google searches or completions, TikTok's trending searches or hashtags, or a trend page on an "
+    "registered domains, Google searches or completions, TikTok's trending searches or hashtags (also those of the accounts selling AI templates), or a trend page on an "
     "AI tool site. A TikTok search like '<term> trend', '<term> meme', '<term> challenge' or '<term> goes viral' hints "
     "at a trend; a headline about a trial, a match, a launch or a company does not. A domain with ai, video, generator, trend or filter around the term hints at an "
     "AI video template; a search like '<term> ai' or '<brand> <term>' hints at the same.\n"

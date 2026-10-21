@@ -26,6 +26,7 @@
   },
 
   "searchwords": {"on": true},
+  "templates": {"on": true},
 
   "pages": {
     "dreamina": {"index": "https://dreamina.capcut.com/sitemap/new/513641/article/sitemap_index.xml",

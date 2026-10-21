@@ -9,6 +9,7 @@ Signals:
   ① rising    searches Google Trends lists as rising around your seed words (SerpApi)
   ① tiktok    hashtags new to TikTok's trending top 100 (AIsa)
   ① searchwords  TikTok's trending searches, new since the last run (AIsa); they feed the watch list
+  ① templates  the hashtags of TikTok's AI template sellers, of the last day (AIsa, hourly); they feed the watch list
   ✅ demand    a watched name Google now completes with "ai": people look for the tool (free)
   ① pages     trend pages new to an AI tool site's sitemap (Dreamina), the slug as the name
   ② breakout  one new GitHub repo taking off on its own
@@ -47,10 +48,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, covered, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, tiktok, usecases, watch
+from . import asks, breakout, config, covered, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, templates, tiktok, usecases, watch
 from .i18n import t
 
-SKIPPABLE = {"covered", "x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"covered", "templates", "x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -127,6 +128,7 @@ def cmd_searchwords(args, cfg: dict, state: Path) -> int:
     from `sources`. New ones join the watch list; a watched name Google now completes with "ai" is
     pushed. No heartbeat: `sources` sends that."""
     blocks = {"searchwords": run(lambda: searchwords.trending(cfg, state), "searchwords" in args.skip),
+              "templates": run(lambda: templates.trending(cfg, state), "templates" in args.skip),
               "demand": run(lambda: watch.check(cfg, state), "watch" in args.skip)}
     lead, judged = report.leads(cfg, blocks)
     conn = store.connect(state)
