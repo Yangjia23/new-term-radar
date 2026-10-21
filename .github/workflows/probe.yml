@@ -10,6 +10,9 @@ on:
       script:
         description: "probe_tiktok (other TikTok charts), probe_fresh (the watch list Trends check on known names), probe_series (raw Trends series), probe_templates (template videos of the last day) or probe_timeline (when a trend started: a year of Trends, the earliest TikTok videos)"
         default: "probe_tiktok"
+      args:
+        description: "phrases for the probe, comma-separated (probe_timeline)"
+        default: ""
 
 permissions:
   contents: read
@@ -31,6 +34,7 @@ jobs:
         env:
           AISA_API_KEY: ${{ secrets.AISA_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          PROBE_ARGS: ${{ github.event.inputs.args }}
         run: |
           python scripts/${{ github.event.inputs.script || 'probe_tiktok' }}.py
           cat probe/report.md >> "$GITHUB_STEP_SUMMARY"

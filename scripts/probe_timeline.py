@@ -1,11 +1,15 @@
 """When a trend started, for names whose first sites are known: Google Trends over a year, and the
 earliest TikTok videos a search finds. Writes probe/report.md, the raw answers under probe/.
 
-    python scripts/probe_timeline.py      # needs AISA_API_KEY
+    python scripts/probe_timeline.py ["phrase one, phrase two"]    # needs AISA_API_KEY
+    PROBE_ARGS="dime dime baby, dime dime baby ai" python scripts/probe_timeline.py
+
+The phrases, when given, are both read in Trends and searched on TikTok.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -38,6 +42,10 @@ def _videos(answer: dict) -> list[dict]:
 
 
 def main() -> int:
+    global TRENDS, SEARCHES
+    given = [p.strip() for p in (" ".join(sys.argv[1:]) or os.environ.get("PROBE_ARGS", "")).split(",") if p.strip()]
+    if given:
+        TRENDS = SEARCHES = given
     today = date.today()
     out = Path("probe")
     out.mkdir(exist_ok=True)
@@ -47,6 +55,10 @@ def main() -> int:
     # sort_type 0 relevance; publish_time 0 any time
     calls += [{"call_id": f"v{i}_{page}", "tool": VIDEO,
                "arguments": {"keyword": k, "offset": page * 20, "count": 20, "sort_type": 0, "publish_time": 0}}
+              for i, k in enumerate(SEARCHES) for page in range(PAGES)]
+    # the same, of the last week only: the earliest of a young trend, which relevance may rank low
+    calls += [{"call_id": f"w{i}_{page}", "tool": VIDEO,
+               "arguments": {"keyword": k, "offset": page * 20, "count": 20, "sort_type": 0, "publish_time": 7}}
               for i, k in enumerate(SEARCHES) for page in range(PAGES)]
     data, cost = aisa.call_all(calls)
     (out / "raw.json").write_text(json.dumps(data, ensure_ascii=False)[:5_000_000])
@@ -64,14 +76,15 @@ def main() -> int:
     for i, k in enumerate(SEARCHES):
         vids, err = [], []
         for page in range(PAGES):
-            a = data.get(f"v{i}_{page}")
-            if a is None:
-                err.append(f"page {page}: no answer")
-                continue
-            vids += _videos(a)
+            for pre in ("v", "w"):
+                a = data.get(f"{pre}{i}_{page}")
+                if a is None:
+                    err.append(f"{pre} page {page}: no answer")
+                    continue
+                vids += _videos(a)
         vids = sorted({v["id"]: v for v in vids}.values(), key=lambda v: v["day"])
         lines.append(f"### {k} ({len(vids)} videos{'; ' + '; '.join(err) if err else ''})")
-        lines += [f"- {v['day']} · {v['plays']} plays · @{v['author']} · {v['desc']}" for v in vids[:12]]
+        lines += [f"- {v['day']} · {v['plays']} plays · @{v['author']} · {v['desc']}" for v in vids[:15]]
         lines.append("")
     lines.append(f"AIsa cost: ${cost / 1e6:.4f}")
     (out / "report.md").write_text("\n".join(lines) + "\n")
