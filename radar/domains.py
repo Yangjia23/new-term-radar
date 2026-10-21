@@ -54,6 +54,8 @@ RDAP = "https://rdap.verisign.com/com/v1/domain/"
 SAMPLE = 8
 RECENT_DAYS = 10    # a sampled domain registered longer ago than this was re-registered, not new
 SITE_FLOOR = 0.9    # the score of a wave one of whose sites is already a tool for it
+# A single domain is read when its name asks for an AI tool: "toctocaidance", "teslaroadsteraivideo".
+_ASKS_AI = re.compile(r"ai(video|videos|dance|filter|trend|effect|generator|meme|photo|edit)|video|generator")
 INTENT = {"ai", "ia", "video", "videos", "aivideo", "videoai"}
 # Cut off around the name, as a word between hyphens or glued to either end. "ia" (Spanish
 # for AI) only between hyphens: glued, it is the end of media, india, academia.
@@ -282,7 +284,7 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
         r["note"] = t("note_domain", n=r["domains"], tlds=r["tlds"], day=r["registered"]) if regs else \
             t("note_domain_list", n=r["domains"], tlds=r["tlds"], day=r["first_day"][5:])
         reported[r["core"]] = today.isoformat()
-    _vouch(cfg, rows, errors)
+    rows += _look(cfg, folder, rows, [snap.load(kept[d]) for d in read], reported, today, errors)
     snap.save(rpath, reported)
     snap.save(mpath, {d: v for d, v in measured.items() if d in kept})
     out = {"read": read, "window": win_days, "history_days": len(past_days), "first_run": first_run, "terms": rows,
@@ -292,20 +294,66 @@ def diff(cfg: dict, state: Path, today: date | None = None) -> dict:
     return out
 
 
-def _vouch(cfg: dict, rows: list[dict], errors: list[str]) -> None:
-    """A score the judge cannot take from the word alone. "flying car" reads as an everyday word
-    (0.2 on 19 October 2026) while two of its sites were already "Flying Car AI Video Generator":
-    a wave whose site is a tool for it is a strong lead, that site first among its examples.
-    Domains with "ai" alone do not vouch: on 20 October that let through "biography" and "reels"."""
+def candidate(domain: str, min_len: int) -> bool:
+    """A single new domain worth reading: "thrillerdanceai.com", "flyingcaraivideo.app", "toctocaidance.com"."""
+    return cut(domain, min_len)[1] or bool(_ASKS_AI.search(domain.split(".")[0]))
+
+
+def _look(cfg: dict, folder: Path, rows: list[dict], fresh: list[dict[str, list[str]]], reported: dict[str, str],
+          today: date, errors: list[str]) -> list[dict]:
+    """Reads home pages: the first `site_hosts` domains of each wave, and every single new domain
+    named for ai, video or a generator in the lists read today (about 1,200 of 70,000 a day). A
+    wave one of whose sites is a tool for it is a strong lead, that site first among its
+    examples. A single site that is a tool for a trend is a lead on its own: on 20 October 2026,
+    thrillerdanceai.com ("Thriller Dance AI Video Generator") and teslaroadsteraivideo.fun were
+    the only domains of their names, too few for a wave. toctocdance.com, the first site for
+    "toc toc", went up with its domain on 9 October, twelve days before the radar pushed the name.
+    A single site that does not answer yet is read once more `site_retry_days` later.
+    Domains with "ai" alone do not vouch for a wave: on 20 October that let through "biography"."""
     c = cfg["domains"]
+    if not c.get("site_hosts"):
+        return []
+    ppath = folder / "sites.json.gz"
+    pending: dict[str, str] = snap.load(ppath) or {}
+    waves = {d for r in rows for d in r["examples"]}
+    single = {d for day in fresh for ds in day.values() for d in ds if d not in waves and candidate(d, c["min_len"])}
+    due = [d for d, when in pending.items() if when <= today.isoformat() and d not in single]
+    hosts = list(dict.fromkeys([h for r in rows for h in r["examples"][:c["site_hosts"]]] + sorted(single)[:c["site_max"]] + due))
     try:
-        found = sites.tools(rows, c["site_hosts"]) if rows and c.get("site_hosts") else {}
+        heads = sites.heads(hosts)
     except Exception as exc:  # noqa: BLE001 — the waves are reported without it
-        found = {}
         errors.append(f"sites: {type(exc).__name__}: {str(exc)[:100]}")
+        return []
     for r in rows:
-        if r["core"] in found:
-            host, title = found[r["core"]]
+        host = next((h for h in r["examples"][:c["site_hosts"]] if sites.tool(r["core"], heads.get(h, ""))), None)
+        if host:
             r["floor"], r["strong"] = SITE_FLOOR, True
-            r["note"] += t("note_domain_site", host=host, title=title)
+            r["note"] += t("note_domain_site", host=host, title=heads[host].split(" | ")[0][:90])
             r["examples"] = [host] + [d for d in r["examples"] if d != host]
+    pending = {d: w for d, w in pending.items() if d not in due}
+    retry = (today + timedelta(days=c["site_retry_days"])).isoformat()
+    found: dict[str, dict] = {}
+    for d in single | set(due):
+        text = heads.get(d)
+        if text is None:
+            continue
+        if not text and d in single:
+            pending[d] = retry
+            continue
+        named = sites.name(cut(d, c["min_len"])[0], text)
+        if not named or named[1] in reported:
+            continue
+        term, core = named
+        f = found.setdefault(core, {"term": term, "core": core, "hosts": [], "title": text.split(" | ")[0][:90]})
+        f["hosts"].append(d)
+    snap.save(ppath, pending)
+    out = []
+    for core, f in found.items():
+        hosts_ = sorted(f["hosts"], key=lambda d: (len(d), d))
+        reported[core] = today.isoformat()
+        out.append({"term": f["term"], "core": core, "recent": len(hosts_), "lift": 0, "domains": len(hosts_),
+                    "tlds": len({d.rsplit(".", 1)[-1] for d in hosts_}), "intent": len(hosts_), "examples": hosts_[:EXAMPLES],
+                    "variants": list(dict.fromkeys([f["term"], f"{f['term']} ai"])), "first_day": today.isoformat(),
+                    "registered": "", "floor": SITE_FLOOR, "strong": True,
+                    "note": t("note_site_only", host=hosts_[0], title=f["title"])})
+    return out

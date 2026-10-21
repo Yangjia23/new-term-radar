@@ -100,6 +100,7 @@ T = {
     "st_rising": ("- ① Trends rising: {state}", "- ① 趋势飙升:{state}"),
     "st_rising_ok": ("{read}/{seeds} seeds read, {queries} rising queries, {left} SerpApi searches left", "读了 {read}/{seeds} 个种子词,{queries} 个上升查询,SerpApi 剩 {left} 次"),
     "note_domain": ("New domains: {n} ({tlds} TLDs), registered {day}", "新注册域名 {n} 个({tlds} 种后缀),{day} 注册"),
+    "note_site_only": ("New site live: {host} \"{title}\"", "新注册域名上线工具站:{host}「{title}」"),
     "note_domain_site": ("; site live: {host} \"{title}\"", ";已上线工具站:{host}「{title}」"),
     "note_domain_list": ("New domains: {n} ({tlds} TLDs), in the list of {day}", "新注册域名 {n} 个({tlds} 种后缀),{day} 的列表"),
     "domains_h": ("### ③ Words people register domains for (newly registered domains, last {days} lists; 🤖 = with ai or video)",

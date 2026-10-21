@@ -17,12 +17,23 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import UA
 
-TIMEOUT = 10
+TIMEOUT = 8
 MAX_BYTES = 200_000
-WORKERS = 16
+WORKERS = 32
 # The words of an AI tool for a trend: "AI Video Generator", "from one photo", "... AI filter".
-TOOL = re.compile(r"\bai\b.*\b(video|videos|generator|filter|effect|template|maker|photo|image|edit|editor)\b"
+TOOL = re.compile(r"\bai\b.*\b(video|videos|generator|filter|effect|template|maker|photo|image|edit|editor|meme|dance|duet)\b"
                   r"|\b(video|generator|filter|effect|template|maker)\b.*\bai\b|\bfrom (one|a|your) (photo|picture|image|selfie)\b")
+# A single site is a template for a trend: a video, a dance, a filter, a meme, made from a photo.
+# "StoneAI — AI Website Builder", "Proxlai: prices for every AI API" are tools, not for a trend.
+TEMPLATE = re.compile(r"\b(videos?(?! games?)|dance|filter|meme|effect|duet|trend)\b|\bfrom (one|a|your|1|2|1–2|1-2) (car )?(photo|picture|selfie)")
+ADULT = re.compile(r"nsfw|porn|nude|hentai|18\+|xxx")
+# What a title says before "AI": "Flying Car AI Video Generator", "Toc Toc AI – ...".
+_LEAD = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9 '&.-]{1,40}?)\s+AI\b")
+# Words that name no trend: "Making AI Videos", "Free AI Video Generator".
+GENERIC = {"making", "make", "free", "best", "online", "create", "the", "my", "your", "pro", "smart", "easy", "top",
+           "video", "videos", "photo", "image", "art", "magic", "super", "ultimate", "simple", "fast", "instant",
+           "creative", "studio", "mastery", "master", "trend", "trends", "viral", "meme", "dance", "style", "styles",
+           "ai", "maker", "generator", "filter", "effect", "edit", "editor", "app", "tool", "tools"}
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _META = re.compile(r"<meta\b[^>]*>", re.I)
 _CONTENT = re.compile(r"""content\s*=\s*["']([^"']*)["']""", re.I)
@@ -58,13 +69,32 @@ def tool(core: str, text: str) -> bool:
     return core in re.sub(r"[^a-z0-9]", "", low) and bool(TOOL.search(low))
 
 
-def tools(rows: list[dict], per_name: int) -> dict[str, tuple[str, str]]:
-    """{core: (host, its title)} for the rows one of whose first `per_name` domains is a tool for the word."""
-    asks = [(r["core"], h) for r in rows for h in r["examples"][:per_name]]
+def heads(hosts: list[str]) -> dict[str, str]:
+    """{host: its home page's title and description}, "" for a site that does not answer."""
     with ThreadPoolExecutor(WORKERS) as pool:
-        heads = list(pool.map(lambda a: look(a[1]), asks))
-    out: dict[str, tuple[str, str]] = {}
-    for (core, host), text in zip(asks, heads):
-        if core not in out and tool(core, text):
-            out[core] = (host, text.split(" | ")[0][:90])
-    return out
+        return dict(zip(hosts, pool.map(look, hosts)))
+
+
+def name(core: str, text: str) -> tuple[str, str] | None:
+    """(name, core) of the trend a single new site is a tool for, None when it is not one. The name is
+    what its title puts before "AI" ("Thriller Dance AI Video Generator" -> "thriller dance"), when
+    the domain holds it: toctocaidance.com is "toc toc". A title naming no trend ("Making AI
+    Videos", "AI Video Generator") is not one."""
+    low = text.lower()
+    if not (TOOL.search(low) and TEMPLATE.search(low)) or ADULT.search(low):
+        return None
+    m = _LEAD.match(text)
+    if m:
+        lead = " ".join(m.group(1).lower().split())
+        flat = re.sub(r"[^a-z0-9]", "", lead)
+        if len(flat) >= 5 and flat in core and not _generic(flat):
+            return lead, flat
+    return (core, core) if len(core) >= 6 and tool(core, text) and not _generic(core) else None
+
+
+def _generic(flat: str) -> bool:
+    """Made of GENERIC words only: "memevideo", "aivideomaker"."""
+    ok = [True] + [False] * len(flat)
+    for i in range(1, len(flat) + 1):
+        ok[i] = any(ok[j] and flat[j:i] in GENERIC for j in range(max(0, i - 12), i))
+    return ok[-1]

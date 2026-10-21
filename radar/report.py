@@ -126,7 +126,7 @@ def _domain_lines(dm: dict, cfg: dict) -> list[str]:
     rows = dm.get("terms") or []
     if rows:
         lines += [t("domains_cols"), "|---|---|---|---|---|---|"]
-        lines += [f"| **{r['term']}**{' 🤖' if r['intent'] else ''} | {r['domains']} | {r['tlds']} | ×{r['lift']} | "
+        lines += [f"| **{r['term']}**{' 🤖' if r['intent'] else ''} | {r['domains']} | {r['tlds']} | {f"×{r['lift']}" if r['lift'] else t('dash')} | "
                   f"{r.get('registered') or t('dash')} | "
                   f"{', '.join(r['examples'][:4])} |" for r in rows]
     else:

@@ -113,17 +113,62 @@ def test_a_site_is_a_tool_when_its_page_names_the_word_and_an_ai_tool():
     assert not sites.tool("hotellobby", "Flying Car AI Video Generator")          # a tool, for another word
 
 
-def test_a_live_tool_makes_a_wave_strong_and_ai_domains_alone_do_not(monkeypatch):
+def test_a_live_tool_makes_a_wave_strong_and_ai_domains_alone_do_not(tmp_path, monkeypatch):
     monkeypatch.setattr(sites, "look", lambda host: sites.head(PAGES.get(host, "")))
     rows = [{"core": "flyingcar", "intent": 2, "note": "n", "examples": ["flyingcar.dev", "flyingcarai.art"]},
             {"core": "crazyfrog", "intent": 2, "note": "n", "examples": ["crazyfrogai.pro"]},
             {"core": "boxtruck", "intent": 0, "note": "n", "examples": ["boxtruck.now"]}]
     errors = []
-    domains._vouch({"domains": C, "judge": {"min_score": 0.4}}, rows, errors)
+    assert domains._look({"domains": C}, tmp_path, rows, [], {}, TODAY, errors) == []
     car, frog, truck = rows
     assert car["floor"] == domains.SITE_FLOOR and car["strong"] and car["examples"][0] == "flyingcarai.art"
     assert "flyingcarai.art" in car["note"] and "Flying Car AI" in car["note"]
     assert "floor" not in frog and frog["note"] == "n" and "floor" not in truck and errors == []
+
+
+# Single new domains of the list of 20 October 2026 and their titles on the 21st.
+TITLES = {
+    "thrillerdanceai.com": "Thriller Dance AI Video Generator - Lead the Zombie Dance",
+    "teslaroadsteraivideo.fun": "Tesla Roadster AI Video Generator | Custom Flying Car Videos",
+    "catclappingai.org": "Cat Clapping AI – Turn Your Pet Into the Clapping Cat Meme",
+    "zombieaimaker.com": "Zombie Filter – Turn Your Photo into a Zombie with AI | Zombie AI",
+    "stoneai.co.in": "StoneAI — AI Website Builder",
+    "proxlai.com": "Proxlai: prices for every AI API",
+    "aivsgames.com": "AI Playing Video Games: Records & Leaderboards",
+    "memevideomaker.com": "Meme Video Maker: Create Short AI Videos from Photos",
+    "nsfwphototovideo.com": "NSFW Photo to Video · AI Image to Video Generator, 18+",
+    "toctocaidance.com": "",
+}
+
+
+def test_a_single_site_names_its_trend_from_its_title():
+    name = lambda host: sites.name(domains.cut(host, 5)[0], TITLES[host])
+    assert name("thrillerdanceai.com") == ("thriller dance", "thrillerdance")
+    assert name("teslaroadsteraivideo.fun") == ("tesla roadster", "teslaroadster")
+    assert name("catclappingai.org") == ("cat clapping", "catclapping")
+    assert name("zombieaimaker.com") == ("zombie", "zombie")
+    for host in ("stoneai.co.in", "proxlai.com", "aivsgames.com", "memevideomaker.com", "nsfwphototovideo.com"):
+        assert name(host) is None, host
+    assert sites.name("toctocaidance", "Toc Toc AI Video Generator | Toc Toc Dance from One Photo") == ("toc toc", "toctoc")
+
+
+def test_single_sites_of_todays_lists_are_leads_and_a_silent_one_is_read_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(sites, "look", lambda host: TITLES.get(host, ""))
+    fresh = [domains.group(list(TITLES) + ["raindance.com", "quiet.com"], 5)]
+    assert domains.candidate("toctocaidance.com", 5) and not domains.candidate("raindance.com", 5)
+    reported = {"catclapping": "2026-10-10"}
+    out = domains._look({"domains": C}, tmp_path, [], fresh, reported, TODAY, [])
+    by = {r["term"]: r for r in out}
+    assert set(by) == {"thriller dance", "tesla roadster", "zombie"}       # cat clapping was reported already
+    r = by["thriller dance"]
+    assert r["strong"] and r["floor"] == domains.SITE_FLOOR and r["examples"] == ["thrillerdanceai.com"]
+    assert "Thriller Dance AI Video Generator" in r["note"] and reported["thrillerdance"] == TODAY.isoformat()
+    later = TODAY + timedelta(days=C["site_retry_days"])
+    TITLES["toctocaidance.com"] = "Toc Toc AI Video Generator | Toc Toc Dance from One Photo"
+    assert domains._look({"domains": C}, tmp_path, [], [], reported, TODAY + timedelta(days=1), []) == []   # not due yet
+    again = domains._look({"domains": C}, tmp_path, [], [], reported, later, [])
+    assert [r["term"] for r in again] == ["toc toc"]
+    assert domains._look({"domains": C}, tmp_path, [], [], reported, later + timedelta(days=2), []) == []   # read twice, then dropped
 
 
 def test_a_floor_lifts_the_judges_score_in_the_lead(cfg, monkeypatch):
