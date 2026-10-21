@@ -217,8 +217,9 @@ def test_push_has_one_line_per_new_name_with_its_curve(cfg, monkeypatch):
     uc = {"benchmark": "gpts", "rows": [{"phrase": "hotel lobby", "started": "2026-10-12", "now": "rising", "peak_vs": 51, "bench_level": 40}]}
     title, text = report.push(cfg, lead, {"domain": block}, {"usecases": uc})
     assert title == "New-term radar · 7 new"
-    assert "**hotel lobby** · New domains: 7 (6 TLDs), registered 10-14 · rising since 10-12 · still rising · peak vs gpts: 51 vs 40\n" \
-           "    hotellobby.ai, aihotellobby.art, hotellobbyai.com" in text
+    assert "**1. hotel lobby**\nWhy: New domains: 7 (6 TLDs), registered 10-14\n" \
+           "Now: rising since 10-12 · still rising · peak vs gpts: 51 vs 40\n" \
+           "Look: [hotellobby.ai](https://hotellobby.ai) · [its AI versions on TikTok](https://www.tiktok.com/search/video?q=hotel%20lobby%20ai)" in text
     assert "[Full report](https://github.com/me/radar/actions/runs/42)" in text
 
 

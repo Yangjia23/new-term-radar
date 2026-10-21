@@ -23,4 +23,4 @@ def test_the_push_says_when_a_big_site_has_the_name(cfg):
     lead = [{"term": "my ride is here", "kinds": ["demand"], "signals": ["AI versions on TikTok"], "examples": [],
              "known": "", "named": 0.8, "format": "video"}]
     title, text = report.push(cfg, lead, {}, {"covered": {"pages": {"my ride is here": SITEMAP[0]}}})
-    assert "big sites have it already: " + SITEMAP[0] in text
+    assert "Now: [Dreamina has a page](" + SITEMAP[0] + ")" in text

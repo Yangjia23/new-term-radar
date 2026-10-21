@@ -153,7 +153,7 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     scores["mirror"] = 0.2         # judged again with Google's completions, it keeps the score it joined with
     cli.main(args)
     title, text = pushed[0]
-    assert title == "New-term radar · 1 new" and text.startswith("1. **foam mirror**")
+    assert title == "New-term radar · 1 new" and text.startswith("**1. foam mirror** 🎬 · name score 0.80\nWhy: ")
     assert 'Strong: Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
 
 
@@ -248,7 +248,7 @@ def test_the_hourly_job_pushes_demand_and_nothing_else(tmp_path, monkeypatch):
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai filter"]})
     _day(monkeypatch, date(2026, 10, 20))
     cli.main(args)
-    assert len(pushed) == 1 and "**foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1] and "rising since 10-12" in pushed[0][1]
+    assert len(pushed) == 1 and "**1. foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1] and "rising since 10-12" in pushed[0][1]
 
 
 def _video(author, desc, plays=1000):
@@ -315,3 +315,9 @@ def test_names_never_searched_on_tiktok_go_first(tmp_path, monkeypatch, tiktok):
     asked.clear()
     watch.check(cfg, tmp_path, TODAY + timedelta(days=1))
     assert asked[0] == "broom riding"                      # new, ahead of the two searched yesterday
+
+
+def test_ai_music_is_not_an_ai_version_and_a_search_is_cut_before_ai():
+    song = {"data": {"search_item_list": [_video(a, "best ai song??? #slowedaudios #comebackandback") for a in "abc"]}}
+    assert watch._videos(song) == []                         # AI music, not a video template
+    assert searchwords.name("steppin ai dance tutorial") == "steppin"

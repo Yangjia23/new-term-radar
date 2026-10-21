@@ -29,7 +29,8 @@ TAILS = ("goes viral", "go viral", "tiktok", "trend", "trends", "trending", "mem
 
 
 # A trend word inside the search ends the name: "ghostface trend with gf" -> "ghostface".
-_INSIDE = re.compile(r" (?:trend|trends|meme|memes|challenge|goes viral) ")
+# "steppin ai dance tutorial" -> "steppin": the name is what comes before "ai" too.
+_INSIDE = re.compile(r" (?:trend|trends|meme|memes|challenge|goes viral|ai) ")
 
 
 def name(word: str) -> str:

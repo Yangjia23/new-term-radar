@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import urllib.parse
 
 from . import opportunity, config, judge, usecases
 from .domains import span
@@ -553,6 +554,14 @@ def to_push(cfg: dict, lead: list[dict]) -> list[dict]:
     return [r for r in named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]][:SHOWN]
 
 
+def _links(r: dict) -> list[str]:
+    """Where to look: a site the name already has, its AI versions on TikTok, its curve in Google Trends."""
+    q = urllib.parse.quote(f"{r['term']} ai")
+    out = [f"[{h}](https://{h})" for h in r["examples"][:1] if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", h or "")]
+    return out + [f"[{t('fs_tiktok')}](https://www.tiktok.com/search/video?q={q})",
+                  f"[{t('fs_trends')}](https://trends.google.com/trends/explore?date=today%203-m&q={q})"]
+
+
 def _ct(found: dict | None) -> str:
     if not found:
         return ""
@@ -575,10 +584,16 @@ def push(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, dict]
     pages = (extra.get("covered") or {}).get("pages", {})
     lines = []
     for i, r in enumerate(rows, 1):
-        lines.append(f"{i}. **{r['term']}**{_marks(r)} · {'; '.join(r['signals'])}{_trend(curve.get(r['term']), uc.get('benchmark', ''))}"
-                     f"{_ct(live.get(r['term']))}{t('fs_dreamina', url=pages[r['term']]) if r['term'] in pages else ''}")
-        if r["examples"]:
-            lines.append(f"    {', '.join(r['examples'][:3])}")
+        if i > 1:
+            lines.append("")
+        score = t("fs_score", score=f"{r['named']:.2f}") if "named" in r else ""
+        lines.append(f"**{i}. {r['term']}**{_marks(r)}{score}")
+        lines.append(t("fs_why", why="；".join(r["signals"])))
+        now = [x for x in (_trend(curve.get(r["term"]), uc.get("benchmark", "")).strip(" ·"), _ct(live.get(r["term"])).strip(" ·"),
+                           t("fs_dreamina", url=pages[r["term"]]).strip(" ·") if r["term"] in pages else "") if x]
+        if now:
+            lines.append(t("fs_now_line", now="；".join(now)))
+        lines.append(t("fs_look", links=" · ".join(_links(r))))
     if errors:
         lines += ["", t("fs_err", why="; ".join(errors))]
     run = os.environ.get("GITHUB_RUN_ID")

@@ -42,4 +42,5 @@ def test_the_push_line_says_how_many_sites_are_live(cfg, monkeypatch):
     extra = {"ct": {"names": {"hotel lobby": {"live": 2, "checked": 3, "first": "2026-09-24"},
                               "bulin 47": {"live": 0, "checked": 3, "first": None}}}}
     text = report.push(cfg, lead, {"domain": block}, extra)[1]
-    assert "**hotel lobby** · New domains: 7 · CT: 2/3 live, first 09-24" in text and "**bulin 47** · New domains: 5 · CT: none of 3 live" in text
+    assert "**1. hotel lobby**\nWhy: New domains: 7\nNow: sites live: 2 of 3, the first on 09-24\n" in text
+    assert "**2. bulin 47**\nWhy: New domains: 5\nNow: no site live yet (3 domains looked up)\n" in text

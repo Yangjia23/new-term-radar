@@ -54,8 +54,10 @@ SPIKE_PEAK = 50       # of 100: a one-day spike in the window counts when it is 
 _AI = re.compile(r"\bai\b")
 VIDEO = "get_tikhub_tiktok_app_v3_fetch_video_search_result"
 # A caption of an AI version of a trend: "#ai", "ia" (Spanish), a CapCut template, a tutorial.
-AI_VERSION = re.compile(r"(?:^|[\s#])(ai|ia|aidance|aivideo|aitrend|aieffect|aifilter|capcutpioneer|pioneertemplate)\b"
-                        r"|\b(tutorial|template)\b")
+# "best ai song???" (#slowedaudios) is AI music, not a template: the AI must come with a video word.
+AI_VERSION = re.compile(r"#(capcutpioneer|pioneertemplate|aidance|aivideo|aitrend|aieffect|aifilter)\b"
+                        r"|\b(ai|ia)\b.{0,40}\b(tutorial|template|dance|video|effect|filter|trend|efecto|baile|edit)"
+                        r"|\b(tutorial|template|efecto|baile)\b.{0,40}\b(ai|ia)\b")
 # The name an AI version goes by, read before "ai": "dime dime baby ai tutorial".
 _AI_NAME = re.compile(r"([a-z0-9][a-z0-9' ]{2,40}?)\s+(?:ai|ia)\s+(?:tutorial|dance|video|trend|effect|filter|template|edit)")
 _LEADING = {"the", "a", "original", "viral", "new", "how", "to", "make", "create", "do", "this", "trend", "tutorial",
