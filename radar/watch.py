@@ -23,7 +23,8 @@ Google completes a name days after the first sites for it are up. TikTok has the
 first: "toc toc ai dance tutorial" on 3 October 2026, its first site on the 9th, Google's
 completion on the 21st. So each name the judge scored at `tiktok_min` or over is also searched
 on TikTok once a day, "<name> ai" over the last week (about $0.0015 a search, `tiktok_max` a
-run): `tiktok_authors` accounts posting an AI version, a tutorial or a template push it at once.
+run): `tiktok_authors` accounts posting an AI version, a tutorial or a template push it at once,
+when their videos have `tiktok_plays` plays in all; fewer, the name is searched again the next day.
 The AI versions may use another name than the one watched: "baby wow karol g", a TikTok search
 of 19 October, is "dime dime baby ai" in their captions, and is pushed under that name.
 """
@@ -280,7 +281,7 @@ def check(cfg: dict, state: Path, today: date | None = None) -> dict:
             if w["term"] not in found_tt:
                 continue
             w["tchecked"] = today.isoformat()
-            if found_tt[w["term"]]:
+            if found_tt[w["term"]] and found_tt[w["term"]]["plays"] >= c["tiktok_plays"]:
                 w["found"], w["tiktok"], w["emitted"] = today.isoformat(), found_tt[w["term"]], True
                 terms.append(_tiktok_term(w))
     snap.save(path, kept)

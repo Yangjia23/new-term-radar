@@ -33,7 +33,8 @@ DEFAULTS = {
     # The hashtags of TikTok's AI template sellers, through AIsa; they feed the watch list
     "templates": {"on": False, "min_authors": 2, "days": 7},
     "watch": {"kinds": ["searchwords", "templates", "tiktok", "pages"], "min_score": 0.6, "days": 10, "max_lookups": 60, "pause": 1, "gl": "us",
-              "tiktok_min": 0.7, "tiktok_max": 10, "tiktok_authors": 3},   # TikTok searched for AI versions: names at tiktok_min, tiktok_max a run
+              "tiktok_min": 0.7, "tiktok_max": 10, "tiktok_authors": 3,   # TikTok searched for AI versions: names at tiktok_min, tiktok_max a run
+              "tiktok_plays": 100_000},   # and pushed once their AI versions have this many plays in all
     "pages": {},                # trend pages new to an AI tool site's sitemap (Dreamina), see radar/pages.py
     "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run
     "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"],   # the signals whose new names are pushed to Feishu

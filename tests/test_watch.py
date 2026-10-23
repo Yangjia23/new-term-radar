@@ -293,6 +293,18 @@ def test_names_scored_high_are_searched_on_tiktok_and_pushed_under_the_ai_name(t
     assert again["terms"] == [] and asked == ["baby wow karol g"]             # pushed once, not searched again
 
 
+def test_ai_versions_with_few_plays_wait_for_the_next_day(tmp_path, monkeypatch, tiktok):
+    found, asked = tiktok
+    cfg = _cfg()
+    watch.add(cfg, tmp_path, [_lead("bow bow bow", ["searchwords"], 0.8)], TODAY)
+    _google(monkeypatch, {})
+    found["bow bow bow"] = {"name": "bow bow bow", "authors": 3, "videos": 3, "plays": 7559, "example": "@a: x"}
+    assert watch.check(cfg, tmp_path, TODAY)["terms"] == []                  # under 100,000 plays
+    found["bow bow bow"]["plays"] = 150_000
+    (r,) = watch.check(cfg, tmp_path, TODAY + timedelta(days=1))["terms"]
+    assert r["term"] == "bow bow bow" and asked == ["bow bow bow", "bow bow bow"]
+
+
 def test_a_name_without_ai_versions_is_searched_on_tiktok_once_a_day(tmp_path, monkeypatch, tiktok):
     _, asked = tiktok
     cfg = _cfg()
