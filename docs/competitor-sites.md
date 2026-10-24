@@ -30,7 +30,8 @@
 | jeanphilaivideo.com | 10-17 · Spaceship | jean phil | 615498595991 | G-M7C68DMJB5 |
 
 - Cloudflare NS：grant + audrey
-- 每个站单独写代码（配置名都带 hotel_），GA 也各不相同，页面指纹串不起来；串起来的是 Google 登录的 OAuth 项目号
+- 三个站的 favicon.svg 完全相同（674 字节，SHA-256 `573ff2b2c986eb62…`）；同一类模板的另外 8 个站（bbywowgenerator.com、gangnamstylevideo.com、windowpeeperaivideo.com 等）图标各不相同，所以这不是模板默认图标，是他自己的
+- 每个站单独写代码（配置名都带 hotel_），GA 也各不相同，页面文案串不起来；串起来的是 Google 登录的 OAuth 项目号和 favicon
 - 用的是一套 TanStack Start 的 SaaS 模板，配置里有支付宝、微信支付选项
 
 ## 方法
@@ -43,6 +44,7 @@
 | 注册商、注册日期 | RDAP：.com 查 `rdap.verisign.com/com/v1/domain/`，.app 查 `pubapi.registry.google/rdap/domain/` | 节奏，以及跟词有多快 |
 | 页面文案、llms.txt、robots.txt、页脚 | `curl` 首页、`/llms.txt`、`/robots.txt` | 模板复用的作者（A）靠它确认 |
 | 公开配置接口 | `curl https://域名/api/config/public` | 见第 4 步 |
+| favicon | `curl https://域名/favicon.svg`（或首页 `<link rel="icon">` 指向的文件），算 SHA-256 | 作者常给所有站用同一个图标。先拿同模板的陌生站比一下，排除模板默认图标 |
 | 前端打包 | 首页里的 `/assets/*.js`，重点看 config 文件 | 用什么框架、调哪些第三方（生成 API、支付、统计） |
 
 ### 2. 生成候选域名
@@ -75,7 +77,7 @@ cat cands.txt | xargs -P 16 -I{} scripts/sites/ns.sh {} grant audrey     # 输�
 这些 ID 是页面加载后从接口取的，不在 HTML 里，搜索引擎和 GA 反查站（BuiltWith、PublicWWW 一类）都查不到，只能对候选域名逐个请求：
 
 ```sh
-cat live.txt | xargs -P 64 -n 1 scripts/sites/probe.sh     # 打印每个站的 Google 项目号、GA、Clarity、Plausible
+cat live.txt | xargs -P 64 -n 1 scripts/sites/probe.sh     # 打印每个站的 favicon 哈希、Google 项目号、GA、Clarity、Plausible
 ```
 
 `live.txt` 是候选域名里能解析到 IP 的那部分。作者 B 就是这样找到的：三个站的 `google_client_id` 都以 `615498595991-` 开头。
@@ -85,7 +87,7 @@ cat live.txt | xargs -P 64 -n 1 scripts/sites/probe.sh     # 打印每个站的 
 至少两项对得上才算同一个人：
 
 - NS 对 + 页面指纹（作者 A）
-- NS 对 + Google 项目号（作者 B）
+- NS 对 + Google 项目号 + favicon（作者 B）
 
 只有 NS 对上的（roadsterai.io）记为「很可能」。
 
