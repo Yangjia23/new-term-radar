@@ -1,8 +1,12 @@
-// One cron, one command: the radar workflow's `command` input.
+// Four runs a day, at 08:00, 12:00, 17:00 and 21:00 Beijing time: each cron starts the radar
+// workflow once per command, in order (the workflow's concurrency group runs them one by one).
+// searchwords every time; sources (with the heartbeat) morning and night; daily at 17:00, after
+// WhoisDS publishes the day's new domains (about 08:30 UTC). No more than two a cron: GitHub
+// keeps one run pending per concurrency group, and a third would cancel the second.
 const COMMANDS = {
-  "0 0,8,16 * * *": "sources",
-  "15 9 * * *": "daily",
-  "30 * * * *": "searchwords",
+  "0 0,13 * * *": ["sources", "searchwords"],
+  "0 4 * * *": ["searchwords"],
+  "0 9 * * *": ["daily", "searchwords"],
 };
 
 async function dispatch(env, command) {
@@ -32,11 +36,36 @@ async function dispatch(env, command) {
   }
 }
 
+// A failed dispatch says so in Feishu, when the Worker has the radar's three Feishu secrets:
+// on 24 October 2026 GitHub Actions was off for the repository and every run failed for
+// fourteen hours with nothing but a missing card to show for it.
+async function alert(env, text) {
+  if (!env.FEISHU_APP_ID || !env.FEISHU_APP_SECRET || !env.FEISHU_RECEIVE_ID) return;
+  const api = "https://open.feishu.cn/open-apis";
+  const json = { "Content-Type": "application/json; charset=utf-8" };
+  const auth = await (await fetch(`${api}/auth/v3/tenant_access_token/internal`, {
+    method: "POST", headers: json,
+    body: JSON.stringify({ app_id: env.FEISHU_APP_ID, app_secret: env.FEISHU_APP_SECRET }),
+  })).json();
+  await fetch(`${api}/im/v1/messages?receive_id_type=${env.FEISHU_RECEIVE_ID_TYPE || "chat_id"}`, {
+    method: "POST", headers: { ...json, Authorization: `Bearer ${auth.tenant_access_token}` },
+    body: JSON.stringify({ receive_id: env.FEISHU_RECEIVE_ID, msg_type: "text", content: JSON.stringify({ text }) }),
+  });
+}
+
 export default {
   async scheduled(event, env) {
-    const command = COMMANDS[event.cron];
-    if (!command) throw new Error(`no command for cron ${event.cron}`);
-    const status = await dispatch(env, command);
-    console.log(`${command} dispatched (${status})`);
+    const commands = COMMANDS[event.cron];
+    if (!commands) throw new Error(`no command for cron ${event.cron}`);
+    for (const command of commands) {
+      let status;
+      try {
+        status = await dispatch(env, command);
+      } catch (err) {
+        await alert(env, `新词雷达没能启动 ${command}：${err.message}`).catch(() => {});
+        throw err;
+      }
+      console.log(`${command} dispatched (${status})`);
+    }
   },
 };

@@ -1,12 +1,12 @@
 name: New-term radar
 
-# Two schedules, one state:
-#   sources  every 8 hours: X and Hugging Face, where a name is said first. Posts a
-#            report only when there is a new name.
-#   searchwords  every hour: TikTok's trending searches into the watch list (radar/watch.py);
-#            pushes a watched name once Google completes it with "ai".
+# Three commands, one state, four times a day (the schedule is below):
+#   sources  X and Hugging Face (off in this config), Dreamina pages, rising queries and the
+#            watch list. Posts a report only when there is a new name; sends the heartbeat.
+#   searchwords  TikTok's trending searches and template hashtags into the watch list
+#            (radar/watch.py); pushes a watched name once it shows a real need.
 #   daily    once a day: everything else, the review of leads from 14 days ago, and the
-#            source leads of the last day. It runs at 09:15 UTC, after WhoisDS publishes the
+#            source leads of the last day. It runs at 09:00 UTC, after WhoisDS publishes the
 #            day's newly registered domains (around 08:30 UTC).
 #
 # Off until you opt in: set the repository variable RADAR_ENABLED to "true"
@@ -26,8 +26,9 @@ name: New-term radar
 
 # The schedule lives in a Cloudflare Worker (trigger/), which starts each run through
 # workflow_dispatch: GitHub's own schedule dropped or delayed them by hours (on 20 October
-# 2026, 3 of 14 hourly runs started, the daily report 7 hours late). UTC:
-#   0 0,8,16 * * *  sources    15 9 * * *  daily    30 * * * *  searchwords
+# 2026, 3 of 14 hourly runs started, the daily report 7 hours late). UTC, four times a day
+# (08:00, 12:00, 17:00, 21:00 Beijing time), each cron one or more commands in order:
+#   0 0,13 * * *  sources, searchwords    0 4 * * *  searchwords    0 9 * * *  daily, searchwords
 on:
   workflow_dispatch:
     inputs:

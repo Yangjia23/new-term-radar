@@ -4,6 +4,9 @@
 #
 #   npx wrangler deploy
 #   npx wrangler secret put GITHUB_TOKEN   # fine-grained, this repository only, Actions: read and write
+#   npx wrangler secret put FEISHU_APP_ID      # optional, with the two below: a failed start is said in Feishu
+#   npx wrangler secret put FEISHU_APP_SECRET
+#   npx wrangler secret put FEISHU_RECEIVE_ID
 name = "new-term-radar-trigger"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
@@ -14,9 +17,9 @@ REPO = "Yangjia23/new-term-radar"
 WORKFLOW = "radar.yml"
 REF = "main"
 
-# UTC, as the workflow's schedule was
+# UTC: 08:00, 12:00, 17:00 and 21:00 Beijing time
 [triggers]
-crons = ["0 0,8,16 * * *", "15 9 * * *", "30 * * * *"]
+crons = ["0 0,13 * * *", "0 4 * * *", "0 9 * * *"]
 
 [observability]
 enabled = true
