@@ -48,10 +48,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import asks, breakout, config, covered, ct, domains, gsc, new_sites, notify, pages, pains, report, review, revenue, rising, searchwords, sitemaps, sources, store, templates, tiktok, usecases, watch
+from . import asks, breakout, config, domains, gsc, new_sites, notify, pages, pains, pushes, report, review, revenue, rising, searchwords, sitemaps, sources, store, templates, tiktok, usecases, watch
 from .i18n import t
 
-SKIPPABLE = {"covered", "templates", "x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "ct", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
+SKIPPABLE = {"templates", "x", "hf", "searchwords", "watch", "tiktok", "pages", "rising", "breakout", "domains", "sitemaps", "newsites", "revenue", "asks", "gsc", "review", "judge", "usecases", "tutorials"}
 
 
 def run(fn, skip: bool = False) -> dict:
@@ -83,16 +83,9 @@ def _quiet(cfg: dict, job: str, blocks: dict) -> tuple[str, str] | None:
     return report.heartbeat(job, blocks) if cfg["feishu"].get("heartbeat") else None
 
 
-def _live(args, cfg: dict, lead: list[dict]) -> dict:
-    """CT lookups for the names about to be pushed: how many of their sites are live, since when."""
-    rows = report.to_push(cfg, lead)
-    return run(lambda: ct.check(rows, cfg["ct"]), "ct" in args.skip or not args.feishu or not rows or not cfg["ct"]["max_lookups"])
-
-
-def _covered(args, cfg: dict, state: Path, lead: list[dict]) -> dict:
-    """The Dreamina pages of the names about to be pushed: a trend the big sites serve already."""
-    rows = report.to_push(cfg, lead)
-    return run(lambda: {"pages": covered.dreamina(state, [r["term"] for r in rows])}, "covered" in args.skip or not rows)
+def _card(args, cfg: dict, state: Path, lead: list[dict], blocks: dict) -> tuple[str, str] | None:
+    """The Feishu card (radar/pushes.py), only when it is sent: choosing it updates the ledger of pushes."""
+    return pushes.push(cfg, state, lead, blocks) if args.feishu else None
 
 
 def cmd_sources(args, cfg: dict, state: Path) -> int:
@@ -113,10 +106,8 @@ def cmd_sources(args, cfg: dict, state: Path) -> int:
              "watch": run(lambda: {"added": watch.add(cfg, state, lead)}, "watch" in args.skip)}
     errors = any(b.get("error") for b in (*blocks.values(), *extra.values()))
     if report.named(cfg, lead) or errors:
-        extra["ct"] = _live(args, cfg, lead)
-        extra["covered"] = _covered(args, cfg, state, lead)
         _finish(args, report.sources(cfg, lead, blocks, extra), f"New-term radar · sources {date.today()}",
-                report.push(cfg, lead, blocks, extra), _quiet(cfg, "sources", blocks))
+                _card(args, cfg, state, lead, blocks), _quiet(cfg, "sources", blocks))
     else:
         print(t("sources_quiet") + "; ".join(f"{k} {v.get('posts', v.get('models', t('dash')))}" for k, v in blocks.items()))
         _push(args, _quiet(cfg, "sources", blocks))
@@ -138,8 +129,7 @@ def cmd_searchwords(args, cfg: dict, state: Path) -> int:
     if args.out:
         Path(args.out).write_text(text)
     print(text)
-    extra["covered"] = _covered(args, cfg, state, lead)
-    _push(args, report.push(cfg, lead, blocks, extra))
+    _push(args, _card(args, cfg, state, lead, blocks))
     return 0
 
 
@@ -190,9 +180,7 @@ def cmd_daily(args, cfg: dict, state: Path) -> int:
     if args.out:
         Path(args.out).with_suffix(".json").write_text(json.dumps(
             {"leads": lead, **blocks, "gsc": found, "review": rev, "summary": summ, "keywords": extra["usecases"]}, ensure_ascii=False, indent=1, default=str))
-    extra["ct"] = _live(args, cfg, lead)
-    extra["covered"] = _covered(args, cfg, state, lead)
-    _finish(args, text, f"New-term radar {date.today()}", report.push(cfg, lead, blocks, extra), _quiet(cfg, "daily", blocks))
+    _finish(args, text, f"New-term radar {date.today()}", _card(args, cfg, state, lead, blocks), _quiet(cfg, "daily", blocks))
     return 0
 
 

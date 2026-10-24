@@ -126,19 +126,22 @@ T = {
     "fs_alert": ("New-term radar · a source failed", "新词雷达 · 数据源异常"),
     "fs_quiet": ("New-term radar · {job}: ran fine, nothing new", "新词雷达 · {job}:运行正常,无新词"),
     "fs_ok": ("ok", "正常"),
-    "fs_trend": (" · rising since {day}", " · {day} 起涨"),
-    "fs_now": (" · {now}", " · {now}"),
-    "fs_peak": (" · peak vs {bench}: {peak} vs {level}", " · 峰值 vs {bench}:{peak} vs {level}"),
     "fs_err": ("Failed: {why}", "异常:{why}"),
-    "fs_ct": (" · sites live: {live} of {checked}, the first on {first}", " · 已有 {live} 个站上线(查了 {checked} 个域名,最早 {first})"),
-    "fs_dreamina": (" · [Dreamina has a page]({url})", " · [Dreamina 已有页面]({url})"),
-    "fs_ct_none": (" · no site live yet ({checked} domains looked up)", " · 还没有站上线(查了 {checked} 个域名)"),
-    "fs_score": (" · name score {score}", " · 名字分 {score}"),
-    "fs_why": ("Why: {why}", "推送原因:{why}"),
-    "fs_now_line": ("Now: {now}", "现状:{now}"),
-    "fs_look": ("Look: {links}", "去看看:{links}"),
-    "fs_tiktok": ("its AI versions on TikTok", "TikTok 上的 AI 版"),
-    "fs_trends": ("Google Trends", "Google 趋势"),
+    # the push card (radar/pushes.py)
+    "fs2_title": ("New-term radar · {new} new · {up} growing", "新词雷达 · {new} 个首推 · {up} 个升温"),
+    "fs2_new": ("<font color='green'>🆕 new</font>", "<font color='green'>🆕 首推</font>"),
+    "fs2_up": ("<font color='orange'>📈 growing</font>", "<font color='orange'>📈 升温</font>"),
+    "fs2_video": ("🎬 video", "🎬 视频"), "fs2_image": ("🖼 image", "🖼 图片"), "fs2_voice": ("🎙 voice", "🎙 声音"),
+    "fs2_rising": ("<font color='blue'>rising</font>", "<font color='blue'>上升中</font>"),
+    "fs2_since": ("AI versions since {day}", "AI 版 {day} 起"),
+    "fs2_ai": ("{authors} accounts, {plays} plays", "{authors} 个账号 {plays} 播放"),
+    "fs2_first": ("first pushed {day}", "首推 {day}"),
+    "fs2_authors_up": ("accounts {a}→{b}", "账号 {a}→{b}"),
+    "fs2_plays_up": ("plays {a}→{b}", "播放 {a}→{b}"),
+    "fs2_taken": ("domains {n}/{of} taken", "域名 {n}/{of} 已注册"),
+    "fs2_taken_since": (" (since {day})", "({day} 起)"),
+    "fs2_dreamina": ("[Dreamina has a page]({url})", "[Dreamina 已有页]({url})"),
+    "fs2_from": ("caught as {terms}", "原词 {terms}"),
     "fs_link": ("[Full report]({url})", "[完整日报]({url})"),
     # daily report
     "title": ("## New-term radar", "## 新词雷达"),
@@ -261,6 +264,10 @@ T = {
 def set_lang(lang: str) -> None:
     global _LANG
     _LANG = "zh" if str(lang).lower().startswith("zh") else "en"
+
+
+def lang() -> str:
+    return _LANG
 
 
 def t(key: str, **kw) -> str:

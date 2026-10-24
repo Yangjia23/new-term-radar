@@ -17,10 +17,3 @@ def test_a_name_is_found_in_the_kept_sitemap_then_at_the_usual_slugs(tmp_path, m
     assert found == {"my ride is here": SITEMAP[0], "crazy frog": SITEMAP[1], "toc toc": SITEMAP[2], "closed on sunday": up}
     assert all("my-ride" not in u and "crazy-frog" not in u for u in asked)     # found in the sitemap: not asked
     assert len([u for u in asked if "foam-mirror" in u]) == len(covered.SLUGS)
-
-
-def test_the_push_says_when_a_big_site_has_the_name(cfg):
-    lead = [{"term": "my ride is here", "kinds": ["demand"], "signals": ["AI versions on TikTok"], "examples": [],
-             "known": "", "named": 0.8, "format": "video"}]
-    title, text = report.push(cfg, lead, {}, {"covered": {"pages": {"my ride is here": SITEMAP[0]}}})
-    assert "Now: [Dreamina has a page](" + SITEMAP[0] + ")" in text

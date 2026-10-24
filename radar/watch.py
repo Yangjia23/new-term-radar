@@ -113,6 +113,7 @@ def _term(w: dict) -> dict:
     when = t("demand_tiny") if curve.get("no_data") else t("demand_new", day=curve["started"][5:], now=t("now_" + curve["now"]))
     return {"term": w["term"], "examples": found[:3], "variants": [w["term"], f"{w['term']} ai", *found[:3]],
             "recent": len(found), "floor": w.get("score"), "strong": sure,
+            "curve": {"started": curve.get("started"), "now": curve.get("now")} if not curve.get("no_data") else {},
             "note": t("note_demand_strong" if sure else "note_demand_weak", top=top, n=len(found), days=days) + when}
 
 
@@ -163,7 +164,7 @@ def _videos(answer: dict) -> list[dict]:
         tags = " ".join("#" + x.get("hashtag_name", "") for x in a.get("text_extra") or [] if x.get("hashtag_name"))
         text = " ".join(f"{a.get('desc') or ''} {tags}".lower().split())
         if a.get("create_time") and AI_VERSION.search(text):
-            out.append({"author": (a.get("author") or {}).get("unique_id"), "text": text,
+            out.append({"author": (a.get("author") or {}).get("unique_id"), "text": text, "time": a["create_time"],
                         "plays": (a.get("statistics") or {}).get("play_count") or 0})
     return out
 
@@ -180,7 +181,7 @@ def _ai_name(text: str) -> str | None:
 
 def ai_versions(term: str, videos: list[dict], min_authors: int) -> dict | None:
     """The AI versions of `term` among a search's videos, when `min_authors` accounts posted them:
-    {"name", "authors", "videos", "plays", "example"}. The videos are those that name the term, or
+    {"name", "authors", "videos", "plays", "example", "captions", "since"}. The videos are those that name the term, or
     the name its AI versions go by when one of them names both."""
     key = _flat(term)
     names: dict[str, set] = {}
@@ -198,8 +199,11 @@ def ai_versions(term: str, videos: list[dict], min_authors: int) -> dict | None:
         return None
     top = max(mine, key=lambda v: v["plays"])
     name = alt if alt and _flat(alt) != key and len(names[alt]) >= 2 else term
+    by_plays = sorted(mine, key=lambda v: -v["plays"])
+    times = [v["time"] for v in mine if v.get("time")]
     return {"name": name, "authors": len(authors), "videos": len(mine), "plays": sum(v["plays"] for v in mine),
-            "example": f"@{top['author']}: {top['text'][:80]}"}
+            "example": f"@{top['author']}: {top['text'][:80]}", "captions": [v["text"][:120] for v in by_plays[:4]],
+            "since": date.fromtimestamp(min(times)).isoformat() if times else None}
 
 
 def tiktok(terms: list[str], min_authors: int) -> tuple[dict[str, dict | None], int]:
@@ -215,8 +219,9 @@ def tiktok(terms: list[str], min_authors: int) -> tuple[dict[str, dict | None], 
 def _tiktok_term(w: dict) -> dict:
     v = w["tiktok"]
     name = v["name"]
-    return {"term": name, "examples": [v["example"]], "variants": list(dict.fromkeys([name, f"{name} ai", w["term"]])),
+    return {"term": name, "examples": v.get("captions") or [v["example"]], "variants": list(dict.fromkeys([name, f"{name} ai", w["term"]])),
             "recent": v["authors"], "floor": w.get("score"), "strong": True,
+            "tiktok": {"authors": v["authors"], "plays": v["plays"], "since": v.get("since")},
             "note": t("note_tiktok_ai", n=v["authors"], videos=v["videos"], plays=f"{v['plays']:,}")
                     + (t("note_tiktok_watched", term=w["term"]) if name != w["term"] else "")}
 

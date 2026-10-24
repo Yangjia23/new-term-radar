@@ -36,9 +36,12 @@ DEFAULTS = {
               "tiktok_min": 0.7, "tiktok_max": 10, "tiktok_authors": 3,   # TikTok searched for AI versions: names at tiktok_min, tiktok_max a run
               "tiktok_plays": 100_000},   # and pushed once their AI versions have this many plays in all
     "pages": {},                # trend pages new to an AI tool site's sitemap (Dreamina), see radar/pages.py
-    "ct": {"max_lookups": 9, "per_name": 3},    # CT lookups (Cert Spotter, free) for the names pushed, per run
-    "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"],   # the signals whose new names are pushed to Feishu
+    "feishu": {"kinds": ["demand", "domain"],   # the signals whose new names are pushed to Feishu
                "heartbeat": False},     # true: a short card on a run with nothing new, so silence means trouble
+    # When a trend is pushed, see radar/pushes.py: domains taken in the last recent_days count, a first domain older
+    # than old_days means it is over; pushed again when plays grow grow_plays times, accounts grow_authors times,
+    # or grow_taken more domains are taken.
+    "push": {"recent_days": 30, "old_days": 14, "min_taken": 2, "grow_plays": 3, "grow_authors": 2, "grow_taken": 3},
     "usecases": {"per_day": 5, "generic": True, "model": "claude-sonnet-4-6", "min_volume": 50, "trends_max": 10, "recheck_days": 3,
                  "location_code": 2840, "benchmark": "gpts", "min_daily": 300, "related": True, "related_geo": "US",
                  "country_trends": True, "country_min_volume": 1000, "country_max": 8},

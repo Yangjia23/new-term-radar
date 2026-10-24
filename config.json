@@ -19,7 +19,7 @@
   },
   "searchwords": {"on": true},
   "templates": {"on": true},
-  "feishu": {"kinds": ["demand", "domain", "rising", "tiktok", "pages"], "heartbeat": true},
+  "feishu": {"kinds": ["demand", "domain"], "heartbeat": true},
 
   "blocklist": ["huangguo"],
 

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 import pytest
 
 from radar import __main__ as cli
-from radar import config, notify, report, searchwords, watch
+from radar import config, notify, pushes, report, searchwords, watch
 
 TODAY = date(2026, 10, 19)
 WORDS = ["foam mirror tiktok trend", "Bulin 47’s Freestyle Surpasses 50M Views", "Hell Nah Cuh TikTok Meme",
@@ -152,9 +152,18 @@ def test_sources_pushes_a_trending_search_only_once_google_completes_it_with_ai(
     _day(monkeypatch, date(2026, 10, 20))
     scores["mirror"] = 0.2         # judged again with Google's completions, it keeps the score it joined with
     cli.main(args)
+    assert pushed == []            # searched with ai, but no AI versions on TikTok and none of its domains taken
+    _taken(monkeypatch, {"foam mirror": {"taken": 3, "checked": 9, "first": "2026-10-18"}})
+    _google(monkeypatch, {"foam mirror ai": ["foam mirror ai video"]})
+    tmp = tmp_path / "state" / "watch.json.gz"
+    kept = watch.snap.load(tmp)
+    kept["foammirror"].update(found=None, checked=None)      # looked up afresh, now that its domains are taken
+    watch.snap.save(tmp, kept)
+    cli.main(args)
     title, text = pushed[0]
-    assert title == "New-term radar · 1 new" and text.startswith("**1. foam mirror** 🎬 · name score 0.80\nWhy: ")
-    assert 'Strong: Google completes "foam mirror ai video" (1 with ai, 1 days after it was first seen)' in text
+    assert title == "New-term radar · 1 new · 0 growing"
+    assert text.startswith("**[foam mirror](https://www.tiktok.com/search/video?q=foam%20mirror%20ai)**  <font color='green'>🆕 new</font> 🎬 video")
+    assert "\ndomains 3/9 taken (since 10/18)" in text and "score" not in text
 
 
 def test_a_name_searched_for_months_is_set_aside_as_old_and_never_pushed(tmp_path, monkeypatch, curves):
@@ -246,9 +255,14 @@ def test_the_hourly_job_pushes_demand_and_nothing_else(tmp_path, monkeypatch):
     cli.main(args)
     assert pushed == []                                              # a new name, watched: no push, no heartbeat
     _google(monkeypatch, {"foam mirror ai": ["foam mirror ai filter"]})
+    _taken(monkeypatch, {"foam mirror": {"taken": 4, "checked": 9, "first": "2026-10-19"}})
     _day(monkeypatch, date(2026, 10, 20))
     cli.main(args)
-    assert len(pushed) == 1 and "**1. foam mirror**" in pushed[0][1] and "Strong:" in pushed[0][1] and "rising since 10-12" in pushed[0][1]
+    assert len(pushed) == 1 and "**[foam mirror]" in pushed[0][1] and "<font color='blue'>rising</font>" in pushed[0][1]
+
+
+def _taken(monkeypatch, found):
+    monkeypatch.setattr(pushes.taken, "check", lambda names, recent, today=None: {n: found[n] for n in names if n in found})
 
 
 def _video(author, desc, plays=1000):

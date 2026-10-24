@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 import re
-import urllib.parse
 
 from . import opportunity, config, judge, usecases
 from .domains import span
@@ -36,6 +35,9 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
                 row["repo"] = r["repo"]
             if r.get("about"):
                 row["about"] = r["about"]
+            for key in ("tiktok", "curve"):        # what the watch list measured: AI versions, a Trends curve
+                if r.get(key):
+                    row[key] = r[key]
             if r.get("strong"):
                 row["strong"] = True
             if r.get("floor") is not None:      # judged once already: a watched name Google now completes
@@ -536,68 +538,3 @@ def heartbeat(job: str, b: dict[str, dict]) -> tuple[str, str]:
         lines += ["", t("fs_link", url=url)]
     return t("fs_quiet", job=job), "\n".join(lines)
 
-
-def _trend(row: dict | None, bench: str) -> str:
-    """A name's curve in one line, from the keyword table: since when it rises, what it does now, its size."""
-    if not row or row.get("no_data"):
-        return ""
-    out = t("fs_trend", day=row["started"][5:]) if row.get("started") else ""
-    out += t("fs_now", now=t("uc_now_" + row["now"])) if row.get("now") else ""
-    if "peak_vs" in row:
-        out += t("fs_peak", bench=bench, peak=row["peak_vs"], level=row["bench_level"])
-    return out
-
-
-def to_push(cfg: dict, lead: list[dict]) -> list[dict]:
-    """The new names of the pushed signals that the judge kept and the blocklist lets through."""
-    kinds = set(cfg["feishu"]["kinds"])
-    return [r for r in named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]][:SHOWN]
-
-
-def _links(r: dict) -> list[str]:
-    """Where to look: a site the name already has, its AI versions on TikTok, its curve in Google Trends."""
-    q = urllib.parse.quote(f"{r['term']} ai")
-    out = [f"[{h}](https://{h})" for h in r["examples"][:1] if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", h or "")]
-    return out + [f"[{t('fs_tiktok')}](https://www.tiktok.com/search/video?q={q})",
-                  f"[{t('fs_trends')}](https://trends.google.com/trends/explore?date=today%203-m&q={q})"]
-
-
-def _ct(found: dict | None) -> str:
-    if not found:
-        return ""
-    if not found["live"]:
-        return t("fs_ct_none", checked=found["checked"])
-    return t("fs_ct", live=found["live"], checked=found["checked"], first=found["first"][5:])
-
-
-def push(cfg: dict, lead: list[dict], b: dict[str, dict], extra: dict[str, dict]) -> tuple[str, str] | None:
-    """The Feishu message: (title, Markdown) with one line per new name from the pushed signals,
-    and a line for each of those signals that failed; None when there is neither."""
-    kinds = set(cfg["feishu"]["kinds"])
-    rows = to_push(cfg, lead)
-    errors = [f"{t('kind_' + k)}: {v['error']}" for k, v in b.items() if k in kinds and v.get("error")]
-    if not rows and not errors:
-        return None
-    uc = extra.get("usecases") or {}
-    curve = {r["phrase"]: r for r in uc.get("rows", [])}
-    live = (extra.get("ct") or {}).get("names", {})
-    pages = (extra.get("covered") or {}).get("pages", {})
-    lines = []
-    for i, r in enumerate(rows, 1):
-        if i > 1:
-            lines.append("")
-        score = t("fs_score", score=f"{r['named']:.2f}") if "named" in r else ""
-        lines.append(f"**{i}. {r['term']}**{_marks(r)}{score}")
-        lines.append(t("fs_why", why="；".join(r["signals"])))
-        now = [x for x in (_trend(curve.get(r["term"]), uc.get("benchmark", "")).strip(" ·"), _ct(live.get(r["term"])).strip(" ·"),
-                           t("fs_dreamina", url=pages[r["term"]]).strip(" ·") if r["term"] in pages else "") if x]
-        if now:
-            lines.append(t("fs_now_line", now="；".join(now)))
-        lines.append(t("fs_look", links=" · ".join(_links(r))))
-    if errors:
-        lines += ["", t("fs_err", why="; ".join(errors))]
-    run = os.environ.get("GITHUB_RUN_ID")
-    if run:
-        url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{run}"
-        lines += ["", t("fs_link", url=url)]
-    return (t("fs_title", n=len(rows)) if rows else t("fs_alert")), "\n".join(lines)

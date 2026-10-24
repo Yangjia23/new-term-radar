@@ -184,7 +184,7 @@ def test_a_floor_lifts_the_judges_score_in_the_lead(cfg, monkeypatch):
     monkeypatch.setattr(report.judge, "score", lambda rows, model, focus: [r.update(named=0.2) for r in rows] and {"judged": len(rows)})
     row = {"term": "flying car", "recent": 5, "lift": 5.0, "note": "n", "examples": [], "floor": 0.9, "strong": True}
     lead, _ = report.leads(cfg, {"domain": {"terms": [row]}})
-    assert lead[0]["named"] == 0.9 and lead[0]["strong"] and report.to_push(cfg, lead)
+    assert lead[0]["named"] == 0.9 and lead[0]["strong"] and report.named(cfg, lead)
 
 
 def test_diff_with_nothing_online_and_nothing_kept_says_so(tmp_path, monkeypatch):
@@ -208,25 +208,6 @@ def test_the_daily_report_lists_the_waves(cfg):
     lead, block = _lead(cfg, domains.find([domains.group(WAVE)], [], C))
     text = "\n".join(report._domain_lines(block, cfg))
     assert "| **hotel lobby** 🤖 | 7 | 6 | ×6.0 | 10-14 |" in text and "History: 2 days of lists. Under a week" in text
-
-
-def test_push_has_one_line_per_new_name_with_its_curve(cfg, monkeypatch):
-    monkeypatch.setenv("GITHUB_RUN_ID", "42")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "me/radar")
-    lead, block = _lead(cfg, domains.find([domains.group(WAVE)], [], C))
-    uc = {"benchmark": "gpts", "rows": [{"phrase": "hotel lobby", "started": "2026-10-12", "now": "rising", "peak_vs": 51, "bench_level": 40}]}
-    title, text = report.push(cfg, lead, {"domain": block}, {"usecases": uc})
-    assert title == "New-term radar · 7 new"
-    assert "**1. hotel lobby**\nWhy: New domains: 7 (6 TLDs), registered 10-14\n" \
-           "Now: rising since 10-12 · still rising · peak vs gpts: 51 vs 40\n" \
-           "Look: [hotellobby.ai](https://hotellobby.ai) · [its AI versions on TikTok](https://www.tiktok.com/search/video?q=hotel%20lobby%20ai)" in text
-    assert "[Full report](https://github.com/me/radar/actions/runs/42)" in text
-
-
-def test_push_is_quiet_without_news_and_speaks_up_when_the_source_fails(cfg):
-    assert report.push(cfg, [], {"domain": {"terms": []}}, {}) is None
-    title, text = report.push(cfg, [], {"domain": {"error": "OSError: timed out", "terms": []}}, {})
-    assert title == "New-term radar · a source failed" and "③ new domains: OSError: timed out" in text
 
 
 def test_feishu_needs_its_three_keys_and_sends_a_card(monkeypatch):

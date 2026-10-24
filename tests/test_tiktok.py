@@ -61,15 +61,6 @@ def test_a_failed_country_says_so(tmp_path, monkeypatch):
     assert tiktok.trending(copy.deepcopy(config.DEFAULTS), tmp_path, TODAY) == {"skipped": True}
 
 
-def test_a_blocklisted_term_is_never_pushed(cfg, monkeypatch):
-    monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
-    cfg["blocklist"] = ["huangguo"]
-    block = {"terms": [{"term": t, "note": "New domains: 5", "examples": [f"{t.replace(' ', '')}.ai"]} for t in ("huangguo", "huangguodj", "bulin 47")]}
-    lead, _ = report.leads(cfg, {"domain": block})
-    title, text = report.push(cfg, lead, {"domain": block}, {})
-    assert title == "New-term radar · 1 new" and "bulin 47" in text and "huangguo" not in text
-
-
 def test_every_tag_new_to_the_chart_is_listed_with_its_score_even_when_too_short(tmp_path, monkeypatch):
     _answer(monkeypatch, [("bulin47", 13815)])
     tiktok.trending(_cfg(), tmp_path, TODAY)
