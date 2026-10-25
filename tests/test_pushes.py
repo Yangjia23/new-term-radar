@@ -95,6 +95,13 @@ def test_a_trend_is_pushed_once_under_its_name_on_data(cfg, tmp_path, world):
     assert again == [] and held["pushed"] == ["dime dime baby"]         # the same numbers: not again
 
 
+def test_a_new_page_on_a_hand_picked_list_is_pushed_on_its_own(cfg, tmp_path, world):
+    lead = [{**_row("ceiling fan", kinds=("pages",)), "curated": "tryatrend"}, _row("fire text", kinds=("pages",))]
+    chosen, _ = pushes.select(cfg, tmp_path, lead, TODAY)
+    assert [g["name"] for g in chosen] == ["ceiling fan"]                    # Dreamina's page alone is not pushed
+    assert pushes.card(chosen[0], {})[1] == "new on tryatrend"
+
+
 def test_a_trend_is_pushed_again_when_it_grew(cfg, tmp_path, world):
     world["taken"] = {"window peeper": {"taken": 1, "checked": 9, "first": "2026-10-22"}}
     pushes.select(cfg, tmp_path, [_row("window peeper", tiktok={"authors": 3, "plays": 70000, "since": "2026-10-20"})], date(2026, 10, 21))

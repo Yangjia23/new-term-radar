@@ -12,7 +12,8 @@ dance", "my door toc toc", "toc trend toc toc"), categories and holidays ("hallo
    card says what the model thought: the model names, the data decides.
 2. A trend is pushed on data, not on a score: AI versions on TikTok (the watch list's own
    rule, `watch.tiktok_authors` accounts and `watch.tiktok_plays` plays), a wave of new
-   domains, or `min_taken` of the name's nine domains registered in the last `recent_days`
+   domains, a new page on a hand-picked list of trends (a "curated" site in "pages":
+   tryatrend), or `min_taken` of the name's nine domains registered in the last `recent_days`
    (radar/taken.py). Of the trends pushed 16 to 23 October, 18 of 29 had two or more of the
    nine taken, and 4 of 35 of the noise did. A name whose first domain is older than
    `old_days`, or whose Trends curve is already fading, is over and not pushed.
@@ -87,7 +88,7 @@ def _group(rows: list[dict], names: dict[str, dict]) -> list[dict]:
         g = next((g for g in out if same(g["name"], name)), None)
         if g is None:
             g = {"name": name, "terms": [], "kinds": set(), "tiktok": None, "curve": {}, "format": r.get("format", "text"),
-                 "generic": True}
+                 "generic": True, "curated": None}
             out.append(g)
         g["generic"] = g["generic"] and got["generic"]      # one term read as a trend is enough
         g["terms"].append(r["term"])
@@ -96,6 +97,7 @@ def _group(rows: list[dict], names: dict[str, dict]) -> list[dict]:
         if tk and (not g["tiktok"] or tk["plays"] > g["tiktok"]["plays"]):
             g["tiktok"] = tk
         g["curve"] = g["curve"] or r.get("curve") or {}
+        g["curated"] = g["curated"] or r.get("curated")
     return out
 
 
@@ -105,7 +107,7 @@ def select(cfg: dict, state: Path, lead: list[dict], today: date | None = None) 
     today = today or date.today()
     c = cfg["push"]
     kinds = set(cfg["feishu"]["kinds"])
-    rows = [r for r in report.named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]]
+    rows = [r for r in report.named(cfg, lead) if (kinds & set(r["kinds"]) or r.get("curated")) and not r["known"]]
     held: dict[str, list[str]] = {"no_data": [], "over": [], "pushed": []}
     if not rows:
         return [], held
@@ -128,7 +130,7 @@ def select(cfg: dict, state: Path, lead: list[dict], today: date | None = None) 
     for g in groups:
         g["taken"] = found.get(g["name"]) or {"taken": 0, "checked": 0, "first": None}
         tk = g["tiktok"] or {}
-        if not (tk or "domain" in g["kinds"] or g["taken"]["taken"] >= c["min_taken"]):
+        if not (tk or "domain" in g["kinds"] or g["curated"] or g["taken"]["taken"] >= c["min_taken"]):
             held["no_data"].append(g["name"])
             continue
         first = g["taken"]["first"]
@@ -192,6 +194,8 @@ def card(g: dict, pages: dict[str, str]) -> list[str]:
         parts.append(t("fs2_ai", authors=tk["authors"], plays=_plays(tk["plays"])))
     if tn["checked"]:
         parts.append(t("fs2_taken", n=tn["taken"], of=tn["checked"]) + (t("fs2_taken_since", day=tn["first"][5:].replace("-", "/")) if tn["first"] else ""))
+    if g.get("curated"):
+        parts.append(t("fs2_curated", site=g["curated"]))
     if g["name"] in pages:
         parts.append(t("fs2_dreamina", url=pages[g["name"]]))
     others = [x for x in g["terms"] if x != g["name"]]

@@ -35,7 +35,7 @@ def leads(cfg: dict, blocks: dict[str, dict]) -> tuple[list[dict], dict]:
                 row["repo"] = r["repo"]
             if r.get("about"):
                 row["about"] = r["about"]
-            for key in ("tiktok", "curve"):        # what the watch list measured: AI versions, a Trends curve
+            for key in ("tiktok", "curve", "curated"):     # AI versions, a Trends curve, a hand-picked list's page
                 if r.get(key):
                     row[key] = r[key]
             if r.get("strong"):

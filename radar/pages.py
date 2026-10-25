@@ -20,7 +20,9 @@ AI trends since 16 October 2026, keeps each trend at the root (/witch-broom-ai,
                     "skip": ["guides", "es", "ja", "pricing", "terms", "privacy", "halloween", "pets"]}
 
 The sitemap's lastmod is the day it was built for every URL, so the snapshot, not lastmod,
-says what is new.
+says what is new. A site whose list is picked by hand (tryatrend) is marked "curated": its new
+page is the evidence itself, pushed at once (radar/pushes.py); a site that makes a page for
+anything (Dreamina: "fire text", "character reference sheets") only feeds the watch list.
 """
 from __future__ import annotations
 
@@ -82,6 +84,8 @@ def new_pages(cfg: dict, state: Path) -> dict:
                 continue
             row = rows.setdefault(term, {"term": term, "examples": [], "variants": [term, f"{term} ai"], "recent": 0,
                                          "note": t("note_pages", site=site)})
+            if s.get("curated"):
+                row["curated"] = site
             row["recent"] += 1
         snap.save(path, sorted(now))
     out = {"sites": sites, "read": sum(v["urls"] for v in sites.values()), "new": sum(v["new"] for v in sites.values()),

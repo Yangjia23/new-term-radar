@@ -44,7 +44,11 @@ def test_a_site_with_its_trends_at_the_root_skips_its_guides_and_translations(tm
     assert pages.new_pages(c, tmp_path)["read"] == 1
     _sitemap(monkeypatch, ["", "witch-broom-ai", "sorry-i-lied-costume-ai", "es/perdon-trend-ia",
                            "guides/how-to-make-im-so-sorry-i-lied-ai-video", "ja/pricing", "pricing"])
-    assert [r["term"] for r in pages.new_pages(c, tmp_path)["terms"]] == ["sorry i lied costume"]
+    got = pages.new_pages(c, tmp_path)["terms"]
+    assert [r["term"] for r in got] == ["sorry i lied costume"] and "curated" not in got[0]
+    c["pages"]["tryatrend"]["curated"] = True                                   # a hand-picked list: its page is the evidence
+    _sitemap(monkeypatch, ["witch-broom-ai", "sorry-i-lied-costume-ai", "ceiling-fan-ai-trend"])
+    assert pages.new_pages(c, tmp_path)["terms"][0]["curated"] == "tryatrend"
 
 
 def test_a_page_and_a_trends_query_are_one_lead(cfg, monkeypatch):
