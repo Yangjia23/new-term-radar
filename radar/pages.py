@@ -12,8 +12,15 @@ run only keeps what is there.
     }
 
 `index` and `shards` read the sitemap as in "sitemaps"; `sections` are the first path
-segments to keep. The sitemap's lastmod is the day it was built for every URL, so the
-snapshot, not lastmod, says what is new.
+segments to keep, `skip` the first path segments to drop. tryatrend.com, a hand-picked list of
+AI trends since 16 October 2026, keeps each trend at the root (/witch-broom-ai,
+/sorry-i-lied-costume-ai) beside its guides, its Spanish and Japanese copies and its pricing:
+
+      "tryatrend": {"index": "https://tryatrend.com/sitemap.xml",
+                    "skip": ["guides", "es", "ja", "pricing", "terms", "privacy", "halloween", "pets"]}
+
+The sitemap's lastmod is the day it was built for every URL, so the snapshot, not lastmod,
+says what is new.
 """
 from __future__ import annotations
 
@@ -60,8 +67,9 @@ def new_pages(cfg: dict, state: Path) -> dict:
         except Exception as exc:  # noqa: BLE001 — one site down must not stop the others
             errors.append(f"{site}: {str(exc)[:120]}")
             continue
-        sections = tuple(s.get("sections") or ())
-        now = {u for u in urls if not sections or re.sub(r"^https?://[^/]+/", "", u).split("/")[0] in sections}
+        sections, skip = tuple(s.get("sections") or ()), set(s.get("skip") or ())
+        first = {u: re.sub(r"^https?://[^/]+/", "", u).split("/")[0] for u in urls}
+        now = {u for u, seg in first.items() if seg and (not sections or seg in sections) and seg not in skip}
         if not now:     # blocked, empty or a format the reader misses: say so rather than wait forever
             errors.append(f"{site}: no URLs read")
             continue

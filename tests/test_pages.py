@@ -36,6 +36,17 @@ def test_the_first_run_keeps_the_pages_and_later_runs_report_the_new_ones(tmp_pa
     assert later["terms"][0]["examples"] == []                                         # the push names the site, not the page
 
 
+def test_a_site_with_its_trends_at_the_root_skips_its_guides_and_translations(tmp_path, monkeypatch):
+    # tryatrend.com's sitemap of 25 October 2026, in part
+    c = copy.deepcopy(config.DEFAULTS)
+    c["pages"] = {"tryatrend": {"index": f"{SITE}/sitemap.xml", "skip": ["guides", "es", "ja", "pricing"], "pause": 0}}
+    _sitemap(monkeypatch, ["", "witch-broom-ai", "es/trend-escoba-voladora-ia", "guides/how-to-make-witch-broom-ai-video", "pricing"])
+    assert pages.new_pages(c, tmp_path)["read"] == 1
+    _sitemap(monkeypatch, ["", "witch-broom-ai", "sorry-i-lied-costume-ai", "es/perdon-trend-ia",
+                           "guides/how-to-make-im-so-sorry-i-lied-ai-video", "ja/pricing", "pricing"])
+    assert [r["term"] for r in pages.new_pages(c, tmp_path)["terms"]] == ["sorry i lied costume"]
+
+
 def test_a_page_and_a_trends_query_are_one_lead(cfg, monkeypatch):
     monkeypatch.setattr(report.judge, "score", lambda rows, model, focus="names": {"judged": 0})
     blocks = {"pages": {"terms": [{"term": "ozil goal", "note": "New page on dreamina", "examples": []}]},

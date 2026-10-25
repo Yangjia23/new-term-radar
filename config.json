@@ -15,7 +15,9 @@
   "tiktok": {"countries": ["US"], "pages": 2, "days": 7},
   "pages": {
     "dreamina": {"index": "https://dreamina.capcut.com/sitemap/new/513641/article/sitemap_index.xml",
-                 "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]}
+                 "shards": "/default/index\\d+\\.xml$", "sections": ["ai-video", "ai-image", "create"]},
+    "tryatrend": {"index": "https://tryatrend.com/sitemap.xml",
+                  "skip": ["guides", "es", "ja", "pricing", "terms", "privacy", "halloween", "pets"]}
   },
   "searchwords": {"on": true},
   "templates": {"on": true},
