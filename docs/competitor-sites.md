@@ -2,7 +2,7 @@
 
 做梗站的人通常一个梗开一个站，几天一个。找到他手上的全部站，就知道他跟了哪些词、多快能跟上；他新注册的域名，也能反过来当雷达的提前信号。
 
-下面的方法在三个作者身上实际跑通过（2026-10-23、10-24）。
+下面的方法在四个作者身上实际跑通过（2026-10-23～10-25）。
 
 ## 结果
 
@@ -63,6 +63,19 @@
 
 三周 20 个站，几乎每天一个，是目前找到的最快的作者。toctocdance.com 就是 toc toc 的第一个站（10-09），比雷达推出 toc toc（10-21）早 12 天。他跟的 20 个词里，有 11 个从没进过雷达的词库（walk away explosion、venom car、uno reverse car、money flex、millionaire in 30 days、smalltown boy、maior lazer、alors on danse、gas station dance、APT MV、put a ring on it dog），说明他有雷达没有的来源。
 
+**作者 D**：从 hotellobbyai.app 查起（2026-10-25）
+
+| 注册 (UTC) | 域名 | 注册商 | 跟的词 | 证据 |
+|---|---|---|---|---|
+| 09-25 | hotellobbyai.app | Cloudflare | hotel lobby | 起点；比其他所有 hotel lobby 的 .app 都早三天 |
+| 10-09 | aiburningbridges.com | Spaceship | burning bridges | 可能：只有 NS；Startup Fame 提交账号与 Hotel Lobby AI 不同 |
+| 10-15 | zombieloveai.app | Spaceship | zombie couple | NS + 代码里有 `hotel-plans-dialog` |
+| 10-19 | closedonsundayai.app | Spaceship | closed on sunday | NS + 代码里有 `hotel-plans-dialog`、`hotel-photo-draft` |
+
+- Cloudflare NS：lily + scott。每个站新建一套 Google 登录、GA、Clarity 和 favicon，配置 ID 串不起来。
+- 串起来的是**代码沿用的模块名**：不做 hotel lobby 的站，打包产物里还留着 `hotel-plans-dialog` 这类模块，说明是复制 hotellobbyai.app 的代码改的（作者 B 的 hotellobbymaker.com 用的是另一套命名：`hotel-video-packs`、`hotel-lobby`）。
+- 把站提交到 AI 工具目录换外链（startupfa.me、twelve.tools、toolpilot、aiagentsdirectory、theresanaiforthat）。startupfa.me 的页面数据里有提交者的 `user_id`，可以用来比对；但目录站上的账号也可能不同，只能当佐证。
+
 **没找到其他站的**：dimedimebaby.co（10-20 · Spaceship，NS brenda + lou，Google 项目号 248474538179，GA G-Q679N27QG5，标题 "Bby Wow AI Video Generator"）。Codex 查了 10,806 个候选，没有第二个站命中这对 NS 或这个 Google 项目号。
 
 ## 方法
@@ -72,7 +85,7 @@
 | 指纹 | 怎么拿 | 能说明什么 |
 |---|---|---|
 | Cloudflare NS 对 | `dig NS 域名` | 同一个 Cloudflare 账号下的域名共用一对 NS。最好用的串联线索，但同一对 NS 也会分给别的账号，只能说明「可能是同一人」 |
-| 注册商、注册日期 | RDAP：.com 查 `rdap.verisign.com/com/v1/domain/`，.app 查 `pubapi.registry.google/rdap/domain/` | 节奏，以及跟词有多快 |
+| 注册商、注册日期 | 注意注册商和 NS 是两回事：在 Spaceship、Porkbun 买的域名也常挂 Cloudflare 的 NS；NS 对来自 Cloudflare 账号，比注册商更能串联。RDAP：.com 查 `rdap.verisign.com/com/v1/domain/`，.app 查 `pubapi.registry.google/rdap/domain/` | 节奏，以及跟词有多快 |
 | 页面文案、llms.txt、robots.txt、页脚 | `curl` 首页、`/llms.txt`、`/robots.txt` | 模板复用的作者（A）靠它确认 |
 | 公开配置接口 | `curl https://域名/api/config/public` | 见第 4 步 |
 | favicon | `curl https://域名/favicon.svg`（或首页 `<link rel="icon">` 指向的文件），算 SHA-256 | 作者常给所有站用同一个图标。先拿同模板的陌生站比一下，排除模板默认图标 |
@@ -115,13 +128,14 @@ cat live.txt | xargs -P 64 -n 1 scripts/sites/probe.sh     # 打印每个站的 
 
 ### 5. 交叉确认
 
-至少两项对得上才算同一个人。Next.js 站可以比对首页引用的 `/_next/static/chunks/*.js` 文件名，同名多就是同一份构建（作者 C 就是这样确认的）。
+至少两项对得上才算同一个人。作者换了题材但沿用旧代码时，打包产物里会留下旧题材的模块名（作者 D 的 `hotel-plans-dialog`），也是一条好用的证据。Next.js 站可以比对首页引用的 `/_next/static/chunks/*.js` 文件名，同名多就是同一份构建（作者 C 就是这样确认的）。
 
 至少两项对得上才算同一个人：
 
 - NS 对 + 页面指纹（作者 A）
 - NS 对 + Google 项目号 + favicon（作者 B）
 - NS 对 + 同一批构建文件（作者 C）
+- NS 对 + 沿用的旧模块名（作者 D）
 
 只有 NS 对上的（roadsterai.io）记为「很可能」。
 
