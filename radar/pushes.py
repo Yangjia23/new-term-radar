@@ -7,8 +7,9 @@ dance", "my door toc toc", "toc trend toc toc"), categories and holidays ("hallo
 ("window peeper" on the 21st and again on the 23rd). Now:
 
 1. Each term is read for the trend it points to (radar/core.py): "baby wow karol g" is
-   "dime dime baby"; "halloween costume" is no one trend and is dropped. Terms with one
-   name are one card.
+   "dime dime baby". Terms with one name are one card. A name the model takes for a category
+   or a holiday ("halloween costume") is pushed like any other when the data says so, and the
+   card says what the model thought: the model names, the data decides.
 2. A trend is pushed on data, not on a score: AI versions on TikTok (the watch list's own
    rule, `watch.tiktok_authors` accounts and `watch.tiktok_plays` plays), a wave of new
    domains, or `min_taken` of the name's nine domains registered in the last `recent_days`
@@ -77,17 +78,18 @@ def _seed(state: Path, kinds: set[str], today: date) -> dict[str, dict]:
     return out
 
 
-def _group(rows: list[dict], names: dict[str, str]) -> list[dict]:
+def _group(rows: list[dict], names: dict[str, dict]) -> list[dict]:
     """The rows of one trend merged into one: its name, its terms, the best numbers among them."""
     out: list[dict] = []
     for r in rows:
-        name = names.get(r["term"], r["term"])
-        if not name:
-            continue
+        got = names.get(r["term"]) or {"name": r["term"], "generic": False}
+        name = got["name"]
         g = next((g for g in out if same(g["name"], name)), None)
         if g is None:
-            g = {"name": name, "terms": [], "kinds": set(), "tiktok": None, "curve": {}, "format": r.get("format", "text")}
+            g = {"name": name, "terms": [], "kinds": set(), "tiktok": None, "curve": {}, "format": r.get("format", "text"),
+                 "generic": True}
             out.append(g)
+        g["generic"] = g["generic"] and got["generic"]      # one term read as a trend is enough
         g["terms"].append(r["term"])
         g["kinds"] |= set(r["kinds"])
         tk = r.get("tiktok")
@@ -104,14 +106,13 @@ def select(cfg: dict, state: Path, lead: list[dict], today: date | None = None) 
     c = cfg["push"]
     kinds = set(cfg["feishu"]["kinds"])
     rows = [r for r in report.named(cfg, lead) if kinds & set(r["kinds"]) and not r["known"]]
-    held: dict[str, list[str]] = {"not_one_trend": [], "no_data": [], "over": [], "pushed": []}
+    held: dict[str, list[str]] = {"no_data": [], "over": [], "pushed": []}
     if not rows:
         return [], held
     path = state / LEDGER
     ledger: dict[str, dict] = snap.load(path) or _seed(state, kinds, today)
     recent = (today - timedelta(days=c["old_days"])).isoformat()
     names = core.names(rows, cfg["judge"]["model"], [k for k, e in ledger.items() if e["last"] >= recent])
-    held["not_one_trend"] = [r["term"] for r in rows if not names.get(r["term"], r["term"])]
     groups = _group(rows, names)
     for g in groups:            # a trend pushed before keeps the name it was pushed under
         g["key"] = _find(ledger, [g["name"], *g["terms"]])
@@ -171,6 +172,8 @@ def card(g: dict, pages: dict[str, str]) -> list[str]:
     tags = [t("fs2_new") if g["status"] == "new" else t("fs2_up")]
     if g["format"] in ("video", "image", "voice"):
         tags.append(t("fs2_" + g["format"]))
+    if g.get("generic"):
+        tags.append(t("fs2_generic"))
     if g["curve"].get("now") in ("rising", "spike"):
         tags.append(t("fs2_rising"))
     head = f"**[{g['name']}](https://www.tiktok.com/search/video?q={q})**  " + " ".join(tags)
@@ -199,8 +202,9 @@ def card(g: dict, pages: dict[str, str]) -> list[str]:
 
 def push(cfg: dict, state: Path, lead: list[dict], b: dict[str, dict], today: date | None = None) -> tuple[str, str] | None:
     """The Feishu message: (title, Markdown), or None when there is nothing to push and nothing failed."""
-    kinds = set(cfg["feishu"]["kinds"])
-    errors = [f"{t('kind_' + k)}: {v['error']}" for k, v in b.items() if k in kinds and v.get("error")]
+    # every source that failed, not only the pushed kinds: TikTok's searches and template hashtags feed the
+    # watch list, and on 25 October both failed with no word in Feishu
+    errors = [f"{t('kind_' + k)}: {v['error']}" for k, v in b.items() if v.get("error")]
     chosen, _ = select(cfg, state, lead, today)
     if not chosen and not errors:
         return None

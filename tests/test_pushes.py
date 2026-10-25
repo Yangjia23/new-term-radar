@@ -34,14 +34,28 @@ def test_taken_counts_the_recent_registrations_only(monkeypatch):
     assert got["window peeper"] == {"taken": 1, "checked": 9, "first": "2026-10-22"}
 
 
-def test_the_models_answer_names_the_trend_or_nothing():
-    answer = 'ok [{"i": 0, "name": "Dime Dime Baby"}, {"i": 1, "name": ""}, {"i": 7, "name": "x"}, {"i": 2}]'
-    assert core.parse(answer, 3) == {0: "dime dime baby", 1: ""}
+def test_the_models_answer_names_the_trend_and_flags_a_category():
+    answer = ('ok [{"i": 0, "name": "Dime Dime Baby", "generic": false}, {"i": 1, "name": "halloween costume", "generic": true},'
+              ' {"i": 7, "name": "x"}, {"i": 2}, {"i": 2, "name": ""}]')
+    assert core.parse(answer, 3) == {0: {"name": "dime dime baby", "generic": False},
+                                     1: {"name": "halloween costume", "generic": True}}
     assert core.parse("no json", 3) == {}
 
 
+def test_a_trend_the_model_calls_known_goes_by_the_known_name_and_a_new_one_keeps_its_own():
+    answer = ('[{"i": 0, "name": "broom crash", "same_as": "broom riding"}, {"i": 1, "name": "kda firestarter", "same_as": ""},'
+              ' {"i": 2, "name": "x", "same_as": "not known"}, {"i": 3, "name": "", "same_as": "broom riding"}]')
+    got = core.parse(answer, 4, ["broom riding"])
+    assert {i: g["name"] for i, g in got.items()} == {0: "broom riding", 1: "kda firestarter", 2: "x"}
+
+
+def test_the_model_sees_only_the_known_trends_that_share_a_word():
+    rows = [{"term": "witch broom", "examples": ["how to fly on a broom"]}, {"term": "kda firestarter", "examples": []}]
+    assert core._related(["broom riding", "dime dime baby", "toc toc", "letter k"], rows) == ["broom riding"]
+
+
 def test_without_the_model_a_term_is_its_own_name():
-    assert core.names([{"term": "bulin 47", "examples": []}], "m") == {"bulin 47": "bulin 47"}
+    assert core.names([{"term": "bulin 47", "examples": []}], "m") == {"bulin 47": {"name": "bulin 47", "generic": False}}
 
 
 def _row(term, kinds=("demand",), tiktok=None, curve=None, fmt="video"):
@@ -52,16 +66,17 @@ def _row(term, kinds=("demand",), tiktok=None, curve=None, fmt="video"):
 @pytest.fixture
 def world(cfg, monkeypatch):
     """The model's names and the registries' answers, as a test sets them."""
-    w = {"names": {}, "taken": {}}
-    monkeypatch.setattr(core, "names", lambda rows, model, known=None: {r["term"]: w["names"].get(r["term"], r["term"]) for r in rows})
+    w = {"names": {}, "generic": set(), "taken": {}}
+    monkeypatch.setattr(core, "names", lambda rows, model, known=None: {
+        r["term"]: {"name": w["names"].get(r["term"], r["term"]), "generic": r["term"] in w["generic"]} for r in rows})
     monkeypatch.setattr(taken, "check", lambda names, recent, today=None: {n: w["taken"][n] for n in names if n in w["taken"]})
     cfg["feishu"]["kinds"] = ["demand", "domain"]
     return w
 
 
 def test_a_trend_is_pushed_once_under_its_name_on_data(cfg, tmp_path, world):
-    world["names"] = {"baby wow karol g": "dime dime baby", "dancing and eating": "dime dime baby",
-                      "halloween costume": "", "foam mirror": "foam mirror", "jeanphil": "jeanphil"}
+    world["names"] = {"baby wow karol g": "dime dime baby", "dancing and eating": "dime dime baby"}
+    world["generic"] = {"halloween costume"}
     world["taken"] = {"dime dime baby": {"taken": 7, "checked": 9, "first": "2026-10-19"},
                       "jeanphil": {"taken": 3, "checked": 6, "first": "2026-10-06"}}
     tk = {"authors": 18, "plays": 664244, "since": "2026-10-14"}
@@ -69,10 +84,13 @@ def test_a_trend_is_pushed_once_under_its_name_on_data(cfg, tmp_path, world):
             _row("halloween costume", tiktok=tk), _row("foam mirror"), _row("jeanphil"),
             _row("fading thing", curve={"now": "fading"}, tiktok=tk)]
     chosen, held = pushes.select(cfg, tmp_path, lead, TODAY)
-    assert [(g["name"], g["status"], g["terms"]) for g in chosen] == [("dime dime baby", "new", ["baby wow karol g", "dancing and eating"])]
+    # a name the model calls a category is pushed on its data all the same, flagged
+    assert [(g["name"], g["status"], g["terms"], g["generic"]) for g in chosen] == [
+        ("dime dime baby", "new", ["baby wow karol g", "dancing and eating"], False),
+        ("halloween costume", "new", ["halloween costume"], True)]
     assert chosen[0]["tiktok"] == tk                                    # the best numbers of its terms
-    assert held == {"not_one_trend": ["halloween costume"], "no_data": ["foam mirror"],
-                    "over": ["jeanphil", "fading thing"], "pushed": []}
+    assert "<font color='grey'>maybe a category</font>" in pushes.card(chosen[1], {})[0]
+    assert held == {"no_data": ["foam mirror"], "over": ["jeanphil", "fading thing"], "pushed": []}
     again, held = pushes.select(cfg, tmp_path, [_row("dime dime baby", tiktok=tk)], TODAY)
     assert again == [] and held["pushed"] == ["dime dime baby"]         # the same numbers: not again
 
@@ -115,10 +133,13 @@ def test_the_card_has_two_lines_of_numbers(cfg, tmp_path, world, monkeypatch):
                     "\n[Full report](https://github.com/me/radar/actions/runs/42)")
 
 
-def test_push_is_quiet_without_news_and_speaks_up_when_a_source_fails(cfg, tmp_path, world):
+def test_push_is_quiet_without_news_and_speaks_up_when_any_source_fails(cfg, tmp_path, world):
     assert pushes.push(cfg, tmp_path, [], {"domain": {"terms": []}}, TODAY) is None
     title, text = pushes.push(cfg, tmp_path, [], {"domain": {"error": "OSError: timed out", "terms": []}}, TODAY)
     assert title == "New-term radar · a source failed" and "③ new domains: OSError: timed out" in text
+    # a source that only feeds the watch list says so too
+    title, text = pushes.push(cfg, tmp_path, [], {"searchwords": {"error": "AisaError: no trending search words"}}, TODAY)
+    assert "AisaError: no trending search words" in text
 
 
 def test_a_blocklisted_term_is_never_pushed(cfg, tmp_path, world, monkeypatch):

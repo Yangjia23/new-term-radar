@@ -132,6 +132,7 @@ T = {
     "fs2_new": ("<font color='green'>🆕 new</font>", "<font color='green'>🆕 首推</font>"),
     "fs2_up": ("<font color='orange'>📈 growing</font>", "<font color='orange'>📈 升温</font>"),
     "fs2_video": ("🎬 video", "🎬 视频"), "fs2_image": ("🖼 image", "🖼 图片"), "fs2_voice": ("🎙 voice", "🎙 声音"),
+    "fs2_generic": ("<font color='grey'>maybe a category</font>", "<font color='grey'>疑似泛词</font>"),
     "fs2_rising": ("<font color='blue'>rising</font>", "<font color='blue'>上升中</font>"),
     "fs2_since": ("AI versions since {day}", "AI 版 {day} 起"),
     "fs2_ai": ("{authors} accounts, {plays} plays", "{authors} 个账号 {plays} 播放"),
