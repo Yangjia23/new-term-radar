@@ -103,6 +103,19 @@ def test_a_new_page_on_a_hand_picked_list_is_pushed_on_its_own(cfg, tmp_path, wo
     assert pushes.card(chosen[0], {})[1] == "new on tryatrend"
 
 
+def test_a_name_with_one_new_site_alone_is_pushed_tagged(cfg, tmp_path, world):
+    world["taken"] = {"free ai rap": {"taken": 1, "checked": 9, "first": "2026-10-23", "domains": ["freeairapvideo.com"]},
+                      "fridge pov": {"taken": 2, "checked": 9, "first": "2026-10-21",
+                                     "domains": ["fridgepovai.com", "fridgepovaivideo.com"]}}
+    lead = [{**_row("free ai rap", kinds=("domain",)), "examples": ["freeairapvideo.com"]},
+            {**_row("fridge pov", kinds=("domain",)), "examples": ["fridgepovaivideo.fun"]}]
+    chosen, _ = pushes.select(cfg, tmp_path, lead, TODAY)
+    cards = {g["name"]: pushes.card(g, {}) for g in chosen}
+    assert "one site only (a brand?)" in cards["free ai rap"][0]
+    assert cards["free ai rap"][1].endswith("domains 1/9 taken (since 10/23): freeairapvideo.com")
+    assert "one site only" not in cards["fridge pov"][0]                    # others registered it too
+
+
 def test_a_trend_is_pushed_again_when_it_grew(cfg, tmp_path, world):
     world["taken"] = {"window peeper": {"taken": 1, "checked": 9, "first": "2026-10-22"}}
     pushes.select(cfg, tmp_path, [_row("window peeper", tiktok={"authors": 3, "plays": 70000, "since": "2026-10-20"})], date(2026, 10, 21))

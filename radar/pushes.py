@@ -17,6 +17,9 @@ dance", "my door toc toc", "toc trend toc toc"), categories and holidays ("hallo
    (radar/taken.py). Of the trends pushed 16 to 23 October, 18 of 29 had two or more of the
    nine taken, and 4 of 35 of the noise did. A name whose first domain is older than
    `old_days`, or whose Trends curve is already fading, is over and not pushed.
+   A name whose only evidence is one new site, its own domain, is pushed tagged as such: on 26
+   October "free ai rap" was freeairapvideo.com alone, a builder's own brand rather than a
+   trend others were registering.
 3. A ledger of what was pushed (state/pushed.json.gz) holds each trend's names and its numbers
    then. A trend in it is pushed again only when it grew: plays `grow_plays` times, accounts
    `grow_authors` times, or `grow_taken` more domains taken. The card says which: 🆕 or 📈.
@@ -88,7 +91,7 @@ def _group(rows: list[dict], names: dict[str, dict]) -> list[dict]:
         g = next((g for g in out if same(g["name"], name)), None)
         if g is None:
             g = {"name": name, "terms": [], "kinds": set(), "tiktok": None, "curve": {}, "format": r.get("format", "text"),
-                 "generic": True, "curated": None}
+                 "generic": True, "curated": None, "hosts": set()}
             out.append(g)
         g["generic"] = g["generic"] and got["generic"]      # one term read as a trend is enough
         g["terms"].append(r["term"])
@@ -98,6 +101,8 @@ def _group(rows: list[dict], names: dict[str, dict]) -> list[dict]:
             g["tiktok"] = tk
         g["curve"] = g["curve"] or r.get("curve") or {}
         g["curated"] = g["curated"] or r.get("curated")
+        if "domain" in r["kinds"]:
+            g["hosts"] |= {e for e in r.get("examples", []) if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", e or "")}
     return out
 
 
@@ -162,6 +167,12 @@ def select(cfg: dict, state: Path, lead: list[dict], today: date | None = None) 
     return out, held
 
 
+def lone(g: dict) -> bool:
+    """The only evidence is one new site: no AI versions, no hand-picked list, no other domain taken."""
+    return not g.get("tiktok") and not g.get("curated") and \
+        len(g.get("hosts", set()) | set((g.get("taken") or {}).get("domains", []))) <= 1
+
+
 def _plays(n: int) -> str:
     if i18n.lang() == "zh":
         return (f"{n / 10000:.0f}万" if n >= 100000 else f"{n / 10000:.1f}万") if n >= 10000 else f"{n:,}"
@@ -176,6 +187,8 @@ def card(g: dict, pages: dict[str, str]) -> list[str]:
         tags.append(t("fs2_" + g["format"]))
     if g.get("generic"):
         tags.append(t("fs2_generic"))
+    if lone(g):
+        tags.append(t("fs2_lone"))
     if g["curve"].get("now") in ("rising", "spike"):
         tags.append(t("fs2_rising"))
     head = f"**[{g['name']}](https://www.tiktok.com/search/video?q={q})**  " + " ".join(tags)
