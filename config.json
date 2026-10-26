@@ -21,6 +21,7 @@
   },
   "searchwords": {"on": true},
   "templates": {"on": true},
+  "watch": {"max_lookups": 100, "tiktok_max": 60},
   "feishu": {"kinds": ["demand", "domain"], "heartbeat": true},
 
   "blocklist": ["huangguo"],
