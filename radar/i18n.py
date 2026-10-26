@@ -140,6 +140,7 @@ T = {
     "fs2_authors_up": ("accounts {a}→{b}", "账号 {a}→{b}"),
     "fs2_plays_up": ("plays {a}→{b}", "播放 {a}→{b}"),
     "fs2_taken": ("domains {n}/{of} taken", "域名 {n}/{of} 已注册"),
+    "fs2_taken_which": (": {domains}", ":{domains}"),
     "fs2_taken_since": (" (since {day})", "({day} 起)"),
     "fs2_curated": ("new on {site}", "{site} 新上页"),
     "fs2_dreamina": ("[Dreamina has a page]({url})", "[Dreamina 已有页]({url})"),

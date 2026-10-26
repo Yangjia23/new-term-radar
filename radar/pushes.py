@@ -193,7 +193,9 @@ def card(g: dict, pages: dict[str, str]) -> list[str]:
             parts.append(t("fs2_since", day=tk["since"][5:].replace("-", "/")))
         parts.append(t("fs2_ai", authors=tk["authors"], plays=_plays(tk["plays"])))
     if tn["checked"]:
-        parts.append(t("fs2_taken", n=tn["taken"], of=tn["checked"]) + (t("fs2_taken_since", day=tn["first"][5:].replace("-", "/")) if tn["first"] else ""))
+        # which ones: on 26 October "domains 1/9 taken" for "free ai rap" was the one site the lead came from
+        parts.append(t("fs2_taken", n=tn["taken"], of=tn["checked"]) + (t("fs2_taken_since", day=tn["first"][5:].replace("-", "/")) if tn["first"] else "")
+                     + (t("fs2_taken_which", domains=", ".join(tn.get("domains", [])[:3])) if tn.get("domains") else ""))
     if g.get("curated"):
         parts.append(t("fs2_curated", site=g["curated"]))
     if g["name"] in pages:

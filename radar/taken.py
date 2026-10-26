@@ -54,8 +54,9 @@ def registered(domain: str) -> str | None:
 
 
 def check(names: list[str], recent: int, today: date | None = None) -> dict[str, dict]:
-    """{name: {"taken", "checked", "first"}}: of its nine domains, how many were registered in the
-    last `recent` days, how many the registries answered for, and the first of those days."""
+    """{name: {"taken", "checked", "first", "domains"}}: of its nine domains, how many were registered
+    in the last `recent` days, how many the registries answered for, the first of those days, and
+    those domains, earliest first."""
     today = today or date.today()
     floor = (today - timedelta(days=recent)).isoformat()
     todo = {n: spellings(n) for n in dict.fromkeys(names)}
@@ -65,6 +66,7 @@ def check(names: list[str], recent: int, today: date | None = None) -> dict[str,
     out = {}
     for name, hs in todo.items():
         answered = [days[h] for h in hs if days[h] is not None]
-        new = sorted(d for d in answered if d and d >= floor)
-        out[name] = {"taken": len(new), "checked": len(answered), "first": new[0] if new else None}
+        new = sorted((days[h], h) for h in hs if days[h] and days[h] >= floor)
+        out[name] = {"taken": len(new), "checked": len(answered), "first": new[0][0] if new else None,
+                     "domains": [h for _, h in new]}
     return out

@@ -30,8 +30,9 @@ def test_taken_counts_the_recent_registrations_only(monkeypatch):
             "dimedimebabyvideo.app": None, "windowpeeper.com": "2011-03-02", "windowpeeperai.com": "2026-10-22"}
     monkeypatch.setattr(taken, "registered", lambda d: days.get(d, ""))
     got = taken.check(["dime dime baby", "window peeper"], 30, TODAY)
-    assert got["dime dime baby"] == {"taken": 3, "checked": 8, "first": "2026-10-19"}
-    assert got["window peeper"] == {"taken": 1, "checked": 9, "first": "2026-10-22"}
+    assert got["dime dime baby"] == {"taken": 3, "checked": 8, "first": "2026-10-19",
+                                     "domains": ["dimedimebaby.com", "dimedimebabyai.com", "dimedimebaby.org"]}
+    assert got["window peeper"] == {"taken": 1, "checked": 9, "first": "2026-10-22", "domains": ["windowpeeperai.com"]}
 
 
 def test_the_models_answer_names_the_trend_and_flags_a_category():
