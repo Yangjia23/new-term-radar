@@ -17,9 +17,11 @@ REPO = "Yangjia23/new-term-radar"
 WORKFLOW = "radar.yml"
 REF = "main"
 
-# UTC: 08:00, 12:00, 17:00 and 21:00 Beijing time
+# Stopped on 28 October 2026. To restart, put back
+#   crons = ["0 0,13 * * *", "0 4 * * *", "0 9 * * *"]
+# (UTC: 08:00, 12:00, 17:00 and 21:00 Beijing time) and enable radar.yml on GitHub.
 [triggers]
-crons = ["0 0,13 * * *", "0 4 * * *", "0 9 * * *"]
+crons = []
 
 [observability]
 enabled = true
